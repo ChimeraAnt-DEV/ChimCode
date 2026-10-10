@@ -47,6 +47,8 @@ who want a tutor that actually watches their code.
   profile effects, card overlays, themes, banners and Super Days.
 - 💎 **A VIP interface.** Glassmorphism, animated gradients, floating orbs,
   a premium dark theme and six unlockable themes.
+- 📱 **A native Android app.** WebView shell with native Text-To-Speech for
+  Mochi's voice, adaptive launcher icons and an in-app server setup screen.
 
 ---
 
@@ -80,6 +82,25 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 12000
 ```
+
+### Option 4 — Android app
+
+A native Android app is included in [`android/`](android). It wraps ChimCode in
+a WebView and adds **native Text-To-Speech**, so Mochi's voice works on Android.
+
+**Download the APK** from the [**Releases page**](../../releases) — grab
+`chimcode-1.0.0-android.apk`, enable *Install unknown apps*, and open it.
+
+**Build it yourself:**
+
+```bash
+cd android
+echo "sdk.dir=$ANDROID_HOME" > local.properties
+./gradlew assembleDebug               # or assembleRelease for a signed build
+```
+
+Requires JDK 17+ and Android SDK platform 34. See [`android/README.md`](android/README.md)
+for the connect screen, signing and emulator details.
 
 ### App icon
 
@@ -194,6 +215,7 @@ answer for you.
 | Database | **SQLite** (stdlib) | Zero-config, file-based, easy to reset |
 | Auth | **PBKDF2 + HMAC JWT** (stdlib) | Secure hashing and tokens with no dependencies |
 | Frontend | **Vanilla JS + Canvas** | No build step; the robot is drawn frame by frame |
+| Android | **Kotlin + AndroidX WebView** | Native shell with a Text-To-Speech bridge |
 | Icons | **stdlib PNG writer** | Reproducible assets, no tooling required |
 
 The only third-party runtime dependencies are `fastapi`, `uvicorn` and
@@ -224,6 +246,11 @@ ChimCode/
 │   │   ├── shop.py            # Cosmetics catalogue
 │   │   └── curriculum/        # Lesson content for every language
 │   └── requirements.txt
+├── android/                   # Native Android app (Kotlin + WebView + TTS)
+│   ├── app/src/main/          # Activity, layout, manifest, launcher icons
+│   ├── tools/                 # Launcher icon generator
+│   └── gradlew                # Gradle wrapper
+├── .github/workflows/         # CI that builds the APKs
 ├── run.sh                     # One-command launcher
 └── README.md
 ```

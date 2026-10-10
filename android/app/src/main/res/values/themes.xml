@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- SwiftUI-style launch theme that matches the ChimCode palette. -->
+    <style name="Theme.ChimCode" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="android:windowBackground">@color/chim_bg</item>
+        <item name="android:statusBarColor">@color/chim_bg</item>
+        <item name="android:navigationBarColor">@color/chim_bg</item>
+        <item name="colorPrimary">@color/chim_accent</item>
+        <item name="colorAccent">@color/chim_accent2</item>
+    </style>
+</resources>

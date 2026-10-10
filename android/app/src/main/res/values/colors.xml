@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="chim_bg">#07070F</color>
+    <color name="chim_panel">#14142A</color>
+    <color name="chim_text">#EEF0FF</color>
+    <color name="chim_muted">#9AA0C3</color>
+    <color name="chim_accent">#7C5CFF</color>
+    <color name="chim_accent2">#22D3EE</color>
+</resources>

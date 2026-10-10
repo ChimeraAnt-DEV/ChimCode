@@ -1,0 +1,18 @@
+# Android build output (patterns are relative to this android/ directory)
+app/build/
+build/
+.gradle/
+local.properties
+captures/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Keystores and signing material must never be committed
+*.keystore
+*.jks
+
+# IDE
+.idea/
+*.iml

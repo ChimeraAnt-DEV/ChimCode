@@ -37,6 +37,19 @@ Env knobs: `CHIMCODE_SECRET_KEY`, `CHIMCODE_DATA_DIR`, `CHIMCODE_SUPERDAY_COST`,
 - `frontend/bot.js` — the Mochi robot (canvas) + speech voice
 - `frontend/editor.js` — editor, error markers, ghost text, bot bubble
 - `frontend/app.js` — routing, all views, onboarding
+- `android/` — native Android shell (Kotlin WebView + native TTS bridge)
+- `android/tools/make_android_icons.py` — launcher icons from the shared renderer
+
+## Android
+- Kotlin app in `android/`. `MainActivity` loads the SPA in a WebView and injects
+  a `window.mochiVoice` shim backed by Android `TextToSpeech` (via the
+  `ChimVoice` JavaScript interface). The WebView's own `speechSynthesis` is
+  unreliable on Android, so do not rely on it.
+- Build with the committed Gradle wrapper; needs JDK 17+ and Android SDK 34.
+  `android/local.properties` (`sdk.dir=...`) is gitignored.
+- Release signing reads `CHIMCODE_KEYSTORE`, `CHIMCODE_KEYSTORE_PASSWORD`,
+  `CHIMCODE_KEY_ALIAS`, `CHIMCODE_KEY_PASSWORD`; falls back to debug signing.
+- CI in `.github/workflows/android.yml` builds both APKs on pushes to `android/`.
 
 ## Conventions
 - Lessons: add to the relevant `*_lessons.py`, then they appear via the registry.
