@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChimCode — Learn every language, build anything</title>
+  <meta name="description" content="ChimCode teaches you to code in Python, C++, JavaScript and more — all the way to bots, servers and real projects. A premium, animated coding tutor with 700+ achievements." />
+  <meta name="theme-color" content="#0a0a14" />
+  <link rel="icon" href="/assets/icon/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/assets/icon/icon-192.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="bg-fx" class="bg-fx" aria-hidden="true">
+    <span class="orb orb-a"></span>
+    <span class="orb orb-b"></span>
+    <span class="orb orb-c"></span>
+    <div class="grid-overlay"></div>
+  </div>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <!-- Landing / auth -->
+  <main id="gate" class="gate">
+    <section class="gate-hero">
+      <div class="brand-mark">
+        <span class="brand-glyph">◈</span>
+        <span class="brand-name">Chim<em>Code</em></span>
+      </div>
+      <h1 class="hero-title">Learn to code.<br /><span class="grad">Then build <em>anything</em>.</span></h1>
+      <p class="hero-sub">
+        From your first <code>print()</code> to Python bots, C++ engines and live servers.
+        Mochi, your animated robot tutor, watches every line and shows you exactly what to fix —
+        then helps you write it yourself.
+      </p>
+      <ul class="hero-points">
+        <li><span>🤖</span> A 2D robot that hovers over your mistakes and explains out loud</li>
+        <li><span>✨</span> Transparent ghost text that shows what to type next</li>
+        <li><span>🏆</span> 707 achievements, profiles, followers and online status</li>
+        <li><span>📖</span> Earn Books, spend them on cosmetics, effects and Super Days</li>
+      </ul>
+      <div class="hero-stats">
+        <div><strong id="stat-ach">707</strong><span>achievements</span></div>
+        <div><strong id="stat-langs">11</strong><span>languages</span></div>
+        <div><strong id="stat-lessons">50+</strong><span>lessons</span></div>
+      </div>
+    </section>
+
+    <section class="gate-card glass">
+      <div id="bot-stage-gate" class="bot-stage bot-stage--sm"></div>
+      <div class="tabs">
+        <button class="tab active" data-tab="login">Log in</button>
+        <button class="tab" data-tab="register">Create account</button>
+      </div>
+
+      <form id="form-login" class="auth-form">
+        <label>Username or email
+          <input name="username" autocomplete="username" required placeholder="ada_lovelace" />
+        </label>
+        <label>Password
+          <input name="password" type="password" autocomplete="current-password" required placeholder="••••••••" />
+        </label>
+        <button class="btn btn-primary btn-block" type="submit">Enter ChimCode</button>
+      </form>
+
+      <form id="form-register" class="auth-form hidden">
+        <label>Username
+          <input name="username" autocomplete="username" required minlength="3" maxlength="20" placeholder="ada_lovelace" />
+        </label>
+        <label>Email
+          <input name="email" type="email" autocomplete="email" required placeholder="you@example.com" />
+        </label>
+        <label>Password
+          <input name="password" type="password" autocomplete="new-password" required minlength="8" placeholder="At least 8 characters" />
+        </label>
+        <button class="btn btn-primary btn-block" type="submit">Start learning free</button>
+        <p class="fineprint">You get 120 Books and a starter cosmetic set the moment you join.</p>
+      </form>
+      <p id="gate-error" class="form-error" role="alert"></p>
+    </section>
+  </main>
+
+  <!-- Onboarding -->
+  <main id="onboarding" class="onboarding hidden">
+    <div class="onboard-head">
+      <div class="brand-mark small"><span class="brand-glyph">◈</span><span class="brand-name">Chim<em>Code</em></span></div>
+      <div class="progress-track"><div id="onboard-progress" class="progress-fill"></div></div>
+    </div>
+    <div class="onboard-body">
+      <div id="bot-stage-onboard" class="bot-stage bot-stage--md"></div>
+      <div class="onboard-content">
+        <p id="onboard-kicker" class="kicker">Question 1</p>
+        <h2 id="onboard-question">What do you want to build?</h2>
+        <p id="onboard-helper" class="onboard-helper"></p>
+        <div id="onboard-options" class="onboard-options"></div>
+        <div class="onboard-actions">
+          <button id="onboard-back" class="btn btn-ghost" type="button">Back</button>
+          <button id="onboard-next" class="btn btn-primary" type="button" disabled>Continue</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- App shell -->
+  <div id="app" class="app hidden">
+    <header class="topbar glass">
+      <button id="nav-toggle" class="icon-btn nav-toggle" aria-label="Menu">☰</button>
+      <div class="brand-mark small"><span class="brand-glyph">◈</span><span class="brand-name">Chim<em>Code</em></span></div>
+      <nav id="topnav" class="topnav">
+        <button class="nav-link" data-route="learn">Learn</button>
+        <button class="nav-link" data-route="community">Community</button>
+        <button class="nav-link" data-route="achievements">Achievements</button>
+        <button class="nav-link" data-route="shop">Shop</button>
+        <button class="nav-link" data-route="profile">Profile</button>
+      </nav>
+      <div class="topbar-right">
+        <div class="pill pill-books" title="Books — spend on cosmetics and Super Days"><span>📖</span><b id="hud-books">0</b></div>
+        <div class="pill pill-xp" title="Experience"><span>⚡</span><b id="hud-xp">0</b></div>
+        <div class="pill pill-streak" title="Daily streak"><span>🔥</span><b id="hud-streak">0</b></div>
+        <button id="super-badge" class="super-badge hidden" title="Super Day active">🌟 Super Day</button>
+        <button id="hud-avatar" class="hud-avatar" data-route="profile" aria-label="Your profile">🤖</button>
+      </div>
+    </header>
+
+    <main id="view" class="view"></main>
+  </div>
+
+  <!-- Bot companion dock -->
+  <div id="bot-dock" class="bot-dock hidden">
+    <button id="bot-toggle" class="bot-toggle" aria-label="Talk to Mochi">🤖</button>
+    <div id="bot-panel" class="bot-panel glass hidden">
+      <div class="bot-panel-head">
+        <div id="bot-stage-dock" class="bot-stage bot-stage--sm"></div>
+        <div>
+          <strong>Mochi</strong>
+          <p id="bot-status" class="bot-status">Your coding companion</p>
+        </div>
+        <button id="bot-speak-toggle" class="icon-btn" title="Toggle voice">🔊</button>
+      </div>
+      <div id="bot-messages" class="bot-messages"></div>
+      <form id="bot-form" class="bot-form">
+        <input id="bot-input" placeholder="Ask Mochi anything about your code…" autocomplete="off" />
+        <button class="btn btn-primary" type="submit">Ask</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/bot.js"></script>
+  <script src="/editor.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
