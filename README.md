@@ -66,7 +66,7 @@ A native Android app is included in [`android/`](android). Everything is
 bundled inside it, so it works immediately — **no server, no internet, nothing
 to set up**.
 
-**Download the APK** — [**chimcode-1.2.0-android.apk**](https://github.com/ChimeraAnt-DEV/ChimCode/releases/latest)
+**Download the APK** — [**chimcode-1.3.0-android.apk**](https://github.com/ChimeraAnt-DEV/ChimCode/releases/latest)
 (signed, Android 7.0+). Open it, allow *Install unknown apps*, install.
 
 **Build it yourself:**
