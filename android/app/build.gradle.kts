@@ -19,8 +19,8 @@ android {
         applicationId = "dev.chimera.chimcode"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
     }
 
     signingConfigs {
@@ -67,3 +67,12 @@ dependencies {
     implementation("androidx.webkit:webkit:1.11.0")
     implementation("com.google.android.material:material:1.12.0")
 }
+
+// Bundle the web app so the APK runs with no server at all.
+val copyWebAssets = tasks.register<Copy>("copyWebAssets") {
+    from(rootProject.file("../frontend"))
+    into(layout.projectDirectory.dir("src/main/assets/www"))
+    exclude("assets/icon/make_icons.py")
+}
+
+tasks.named("preBuild") { dependsOn(copyWebAssets) }

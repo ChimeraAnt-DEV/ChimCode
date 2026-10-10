@@ -44,7 +44,7 @@ def _startup() -> None:
 # --------------------------------------------------------------------- models
 class RegisterIn(BaseModel):
     username: str = Field(min_length=3, max_length=20)
-    email: str = Field(min_length=5, max_length=120)
+    email: str = Field(default="", max_length=120)
     password: str = Field(min_length=8, max_length=128)
 
 
@@ -286,8 +286,8 @@ def register(body: RegisterIn):
     email = body.email.strip().lower()
     if not username.replace("_", "").isalnum():
         raise HTTPException(400, "Username may only contain letters, numbers and underscores.")
-    if "@" not in email or "." not in email:
-        raise HTTPException(400, "Please enter a valid email address.")
+    if email and ("@" not in email or "." not in email):
+        raise HTTPException(400, "Please enter a valid email address, or leave it blank.")
     with db() as conn:
         exists = conn.execute(
             "SELECT 1 FROM users WHERE username = ? OR email = ?", (username, email)
@@ -296,7 +296,7 @@ def register(body: RegisterIn):
             raise HTTPException(409, "That username or email is already taken.")
         cur = conn.execute(
             "INSERT INTO users (username, email, password_hash, created_at, last_seen) VALUES (?, ?, ?, ?, ?)",
-            (username, email, hash_password(body.password), now(), now()),
+            (username, email or f"{username}@local.chimcode", hash_password(body.password), now(), now()),
         )
         uid = cur.lastrowid
         for item in shop.STARTER_ITEMS:

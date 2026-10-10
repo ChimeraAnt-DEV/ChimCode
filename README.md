@@ -28,6 +28,9 @@ Most coding apps stop at `hello world`. ChimCode is built for people who want to
 **build real things** — Discord bots, HTTP servers, scrapers, systems code — and
 who want a tutor that actually watches their code.
 
+- 🔌 **No server required.** ChimCode runs entirely in your browser. The whole
+  app, all 57 lessons and the achievement engine work offline; your account and
+  progress save on your device. There is nothing to sign up for or pay for.
 - 🤖 **Mochi, a 2D animated robot tutor.** A real canvas-rendered robot with a
   head, torso, robotic arms and legs. It hovers *directly above your mistake*
   with a speech bubble telling you what is wrong and what it should be instead.
@@ -55,53 +58,57 @@ who want a tutor that actually watches their code.
 
 ## Downloads
 
-### Option 1 — Clone and run (recommended)
+### Option 1 — Android app (easiest)
 
-```bash
-git clone https://github.com/ChimeraAnt-DEV/ChimCode.git
-cd ChimCode
-./run.sh
-```
+A native Android app is included in [`android/`](android). Everything is
+bundled inside it, so it works immediately — **no server, no internet, nothing
+to set up**.
 
-Then open **<http://localhost:12000>**.
-
-`run.sh` creates a virtual environment, installs the dependencies, generates a
-secret key and starts the server. That is the whole setup.
-
-### Option 2 — Download the ZIP
-
-1. Click the green **`< > Code`** button on GitHub.
-2. Choose **Download ZIP**, then unzip it.
-3. Run `./run.sh` (macOS/Linux) or `python -m uvicorn app.main:app` from `server/`.
-
-### Option 3 — Manual
-
-```bash
-cd server
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 12000
-```
-
-### Option 4 — Android app
-
-A native Android app is included in [`android/`](android). It wraps ChimCode in
-a WebView and adds **native Text-To-Speech**, so Mochi's voice works on Android.
-
-**Download the APK** — [**chimcode-1.0.0-android.apk**](https://github.com/ChimeraAnt-DEV/ChimCode/releases/download/android-v1.0.0/chimcode-1.0.0-android.apk)
-(4.6 MB, signed, Android 7.0+). Open it, allow *Install unknown apps*, install.
+**Download the APK** — [**chimcode-1.1.0-android.apk**](https://github.com/ChimeraAnt-DEV/ChimCode/releases/latest)
+(signed, Android 7.0+). Open it, allow *Install unknown apps*, install.
 
 **Build it yourself:**
 
 ```bash
+python3 tools/export_static_data.py
 cd android
 echo "sdk.dir=$ANDROID_HOME" > local.properties
 ./gradlew assembleDebug               # or assembleRelease for a signed build
 ```
 
-Requires JDK 17+ and Android SDK platform 34. See [`android/README.md`](android/README.md)
-for the connect screen, signing and emulator details.
+Requires JDK 17+ and Android SDK platform 34. See [`android/README.md`](android/README.md).
+
+### Option 2 — Just open the web app
+
+ChimCode is a static site. **No server is needed** — the app runs entirely in
+your browser and saves progress on your device.
+
+```bash
+git clone https://github.com/ChimeraAnt-DEV/ChimCode.git
+cd ChimCode/frontend
+python3 -m http.server 8080
+```
+
+Then open **<http://localhost:8080>**. That is the whole setup. Any static file
+server works.
+
+### Option 3 — Run the optional server
+
+A Python server is included for shared accounts, a leaderboard across devices
+and a REST API. It is completely optional.
+
+```bash
+./run.sh
+```
+
+Then open **<http://localhost:12000>**. `run.sh` creates a virtual environment,
+installs the dependencies, generates a secret key and starts the server.
+
+### Option 4 — Download the ZIP
+
+1. Click the green **`< > Code`** button on GitHub.
+2. Choose **Download ZIP**, then unzip it.
+3. Follow option 2 or 3 above.
 
 ### App icon
 
@@ -212,16 +219,22 @@ answer for you.
 
 | Layer | Choice | Why |
 | --- | --- | --- |
-| Backend | **FastAPI** + Uvicorn | Fast, typed, auto-documented |
-| Database | **SQLite** (stdlib) | Zero-config, file-based, easy to reset |
-| Auth | **PBKDF2 + HMAC JWT** (stdlib) | Secure hashing and tokens with no dependencies |
-| Frontend | **Vanilla JS + Canvas** | No build step; the robot is drawn frame by frame |
+| App | **Vanilla JS + Canvas** | No build step and no server; runs from a static file |
+| Local backend | **JavaScript + `localStorage`** | The whole API, offline, in the browser |
+| Optional server | **FastAPI** + Uvicorn | Shared accounts and a REST API for multi-device use |
+| Shared data | **Generated JS** | Curriculum, achievements and shop come from the server source |
+| Database (server) | **SQLite** (stdlib) | Zero-config, file-based, easy to reset |
+| Auth (server) | **PBKDF2 + HMAC JWT** (stdlib) | Secure hashing and tokens with no dependencies |
 | Android | **Kotlin + AndroidX WebView** | Native shell with a Text-To-Speech bridge |
 | Icons | **stdlib PNG writer** | Reproducible assets, no tooling required |
 
+The curriculum, the 707-achievement engine and the shop live once in Python
+(`server/app/`) and are exported to `frontend/data/chimdata.js` by
+`tools/export_static_data.py`. The JavaScript engine and local backend read that
+same data, so the offline app and the server can never drift apart.
+
 The only third-party runtime dependencies are `fastapi`, `uvicorn` and
-`pydantic`. Everything else — password hashing, JWTs, database, image
-generation — is the Python standard library.
+`pydantic`, and only if you run the optional server.
 
 ---
 
@@ -229,30 +242,37 @@ generation — is the Python standard library.
 
 ```
 ChimCode/
-├── frontend/                  # The premium single-page app (served by the API)
+├── frontend/                  # The whole app — runs with no server
 │   ├── index.html
 │   ├── styles.css             # Glassmorphism, animations, six themes
 │   ├── app.js                 # Routing, lessons, shop, profiles, onboarding
+│   ├── api.js                 # Picks local or server backend automatically
+│   ├── local.js               # The entire API in the browser (localStorage)
+│   ├── engine.js              # Grading, mistake detection, ghost text, walkthroughs
 │   ├── bot.js                 # Mochi: canvas robot + speech-synthesis voice
 │   ├── editor.js              # Editor, mistake markers, ghost text, bot overlay
+│   ├── data/chimdata.js       # Generated curriculum, achievements and shop
 │   ├── manifest.webmanifest
 │   └── assets/icon/           # App icons 16→1024px, SVG, generator script
-├── server/
+├── server/                    # Optional: shared accounts + REST API
 │   ├── app/
 │   │   ├── main.py            # FastAPI app and every API route
 │   │   ├── database.py        # SQLite schema and helpers
 │   │   ├── security.py        # PBKDF2 hashing + JWT
-│   │   ├── engine.py          # Grading, mistake detection, walkthroughs
-│   │   ├── achievements.py    # The 707-achievement engine
-│   │   ├── shop.py            # Cosmetics catalogue
-│   │   └── curriculum/        # Lesson content for every language
+│   │   ├── engine.py          # Python twin of frontend/engine.js
+│   │   ├── achievements.py    # The 707-achievement source of truth
+│   │   ├── shop.py            # Cosmetics catalogue (source of truth)
+│   │   └── curriculum/        # Lesson content (source of truth)
 │   └── requirements.txt
-├── android/                   # Native Android app (Kotlin + WebView + TTS)
+├── tools/
+│   ├── export_static_data.py  # server/app/* -> frontend/data/chimdata.js
+│   └── test_local_backend.js  # Headless tests for the offline backend
+├── android/                   # Native Android app (bundled, offline)
 │   ├── app/src/main/          # Activity, layout, manifest, launcher icons
 │   ├── tools/                 # Launcher icon generator
 │   └── gradlew                # Gradle wrapper
 ├── .github/workflows/         # CI that builds the APKs
-├── run.sh                     # One-command launcher
+├── run.sh                     # Launches the optional server
 └── README.md
 ```
 

@@ -8,13 +8,11 @@ import android.speech.tts.TextToSpeech
 import android.view.View
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
-import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.EditText
-import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -24,21 +22,21 @@ import java.util.Locale
 /**
  * ChimCode Android shell.
  *
- * Loads the ChimCode single-page app in a WebView and adds a native
- * Text-To-Speech bridge so Mochi's bot voice works on Android, where the
- * WebView speechSynthesis API is unreliable.
+ * The whole web app is bundled in the APK, so the app works immediately with
+ * no server and no internet. Mochi's voice is bridged to the native Android
+ * TextToSpeech engine, because the WebView speechSynthesis API is unreliable.
+ *
+ * An advanced option lets the user point at a remote ChimCode server instead.
  */
 class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private lateinit var webView: WebView
     private lateinit var progress: ProgressBar
-    private lateinit var setup: LinearLayout
-    private lateinit var status: TextView
     private lateinit var prefs: SharedPreferences
     private var tts: TextToSpeech? = null
     private var ttsReady = false
 
-    private val defaultUrl = "http://10.0.2.2:12000"
+    private val bundledUrl = "file:///android_asset/www/index.html"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,40 +45,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         webView = findViewById(R.id.webview)
         progress = findViewById(R.id.progress)
-        setup = findViewById(R.id.setup)
-        status = findViewById(R.id.setup_status)
 
         tts = TextToSpeech(this, this)
         configureWebView()
 
-        val url = prefs.getString("server_url", null)
-        if (url.isNullOrBlank()) {
-            showSetup()
-        } else {
-            load(url)
+        findViewById<android.widget.Button>(R.id.menu_button).setOnClickListener {
+            showServerMenu()
         }
-    }
 
-    // ------------------------------------------------------------ setup
-    private fun showSetup(message: String? = null) {
-        setup.visibility = View.VISIBLE
-        webView.visibility = View.GONE
-        message?.let { status.text = it }
-        findViewById<android.widget.Button>(R.id.setup_save).setOnClickListener {
-            val input = findViewById<EditText>(R.id.setup_url)
-            val value = input.text.toString().trim().trimEnd('/')
-            if (!value.startsWith("http")) {
-                status.text = "Enter a full address beginning with http://"
-                return@setOnClickListener
-            }
-            prefs.edit().putString("server_url", value).apply()
-            setup.visibility = View.GONE
-            webView.visibility = View.VISIBLE
-            load(value)
-        }
-        findViewById<android.widget.Button>(R.id.setup_reset).setOnClickListener {
-            findViewById<EditText>(R.id.setup_url).setText(defaultUrl)
-        }
+        // Always start from the bundled app. No setup, no server, no waiting.
+        load(bundledUrl)
     }
 
     // ------------------------------------------------------------ webview
@@ -95,6 +69,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         settings.useWideViewPort = true
         settings.cacheMode = WebSettings.LOAD_DEFAULT
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+        // Let the bundled page call out to a configured server if one is set.
+        settings.allowUniversalAccessFromFileURLs = true
+        settings.allowFileAccessFromFileURLs = true
 
         webView.addJavascriptInterface(ChimVoiceBridge(), "ChimVoice")
         webView.webChromeClient = WebChromeClient()
@@ -102,17 +79,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             override fun onPageFinished(view: WebView, url: String) {
                 progress.visibility = View.GONE
                 injectNativeVoice()
-            }
-
-            override fun onReceivedError(
-                view: WebView,
-                request: WebResourceRequest,
-                error: WebResourceError
-            ) {
-                if (request.isForMainFrame) {
-                    progress.visibility = View.GONE
-                    showSetup("Could not reach the server. Check the address and that ChimCode is running.")
-                }
             }
 
             override fun shouldOverrideUrlLoading(
@@ -128,23 +94,26 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     /**
-     * Replace the web speech shim with a native-backed one so Mochi speaks
-     * through the Android TextToSpeech engine.
+     * Install the native voice shim and honour any saved server override so
+     * the page boots against the right backend.
      */
     private fun injectNativeVoice() {
+        val server = prefs.getString("server_url", "") ?: ""
         val js = """
             (function(){
-              if (window.__chimNativeVoice) return;
-              window.__chimNativeVoice = true;
-              var shim = {
-                enabled: true,
-                speak: function(text){
-                  if (!this.enabled) return;
-                  try { window.ChimVoice.speak(String(text)); } catch(e){}
-                },
-                stop: function(){ try { window.ChimVoice.stop(); } catch(e){} }
-              };
-              window.mochiVoice = shim;
+              if (!window.__chimNativeVoice) {
+                window.__chimNativeVoice = true;
+                window.mochiVoice = {
+                  enabled: true,
+                  speak: function(text){
+                    if (!this.enabled) return;
+                    try { window.ChimVoice.speak(String(text)); } catch(e){}
+                  },
+                  stop: function(){ try { window.ChimVoice.stop(); } catch(e){} }
+                };
+              }
+              var server = ${if (server.isBlank()) "null" else "'" + server + "'"};
+              if (window.ChimAPI) { window.ChimAPI.setServer(server); }
             })();
         """.trimIndent()
         webView.evaluateJavascript(js, null)
@@ -168,21 +137,51 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    // ------------------------------------------------------------ server menu
+    private fun showServerMenu() {
+        val view = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 32, 48, 8)
+        }
+        val info = TextView(this).apply {
+            text = "ChimCode already works offline with no server.\n\n" +
+                "Optionally connect to a ChimCode server on your network to use a shared account:"
+            textSize = 14f
+        }
+        val input = EditText(this).apply {
+            hint = "http://192.168.1.10:12000"
+            setText(prefs.getString("server_url", ""))
+        }
+        view.addView(info)
+        view.addView(input)
+
+        AlertDialog.Builder(this)
+            .setTitle("Advanced: server connection")
+            .setView(view)
+            .setPositiveButton("Use server") { _, _ ->
+                val value = input.text.toString().trim().trimEnd('/')
+                prefs.edit().putString("server_url", value).apply()
+                restartBundled()
+            }
+            .setNeutralButton("Use offline only") { _, _ ->
+                prefs.edit().putString("server_url", "").apply()
+                restartBundled()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun restartBundled() {
+        webView.clearCache(false)
+        load(bundledUrl)
+    }
+
     // ------------------------------------------------------------ tts
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
             val result = tts?.setLanguage(Locale.US)
             ttsReady = result != TextToSpeech.LANG_MISSING_DATA &&
                 result != TextToSpeech.LANG_NOT_SUPPORTED
-        }
-    }
-
-    override fun onBackPressed() {
-        if (webView.canGoBack()) {
-            webView.goBack()
-        } else {
-            @Suppress("DEPRECATION")
-            super.onBackPressed()
         }
     }
 

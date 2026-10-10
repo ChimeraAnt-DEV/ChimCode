@@ -23,6 +23,7 @@
   </div>
 
   <div id="toasts" class="toasts" aria-live="polite"></div>
+  <div id="mode-badge" class="mode-badge hidden"></div>
 
   <!-- Landing / auth -->
   <main id="gate" class="gate">
@@ -53,32 +54,32 @@
     <section class="gate-card glass">
       <div id="bot-stage-gate" class="bot-stage bot-stage--sm"></div>
       <div class="tabs">
-        <button class="tab active" data-tab="login">Log in</button>
-        <button class="tab" data-tab="register">Create account</button>
+        <button class="tab active" data-tab="register">Create account</button>
+        <button class="tab" data-tab="login">Log in</button>
       </div>
 
-      <form id="form-login" class="auth-form">
-        <label>Username or email
+      <form id="form-register" class="auth-form">
+        <label>Username
+          <input name="username" autocomplete="username" required minlength="3" maxlength="20" placeholder="ada_lovelace" />
+        </label>
+        <label>Email <span class="optional">(optional)</span>
+          <input name="email" type="email" autocomplete="email" placeholder="you@example.com" />
+        </label>
+        <label>Password
+          <input name="password" type="password" autocomplete="new-password" required minlength="8" placeholder="At least 8 characters" />
+        </label>
+        <button class="btn btn-primary btn-block" type="submit">Start learning free</button>
+        <p id="gate-fineprint" class="fineprint">Everything saves on this device. No server, no sign-up fees, no internet required.</p>
+      </form>
+
+      <form id="form-login" class="auth-form hidden">
+        <label>Username
           <input name="username" autocomplete="username" required placeholder="ada_lovelace" />
         </label>
         <label>Password
           <input name="password" type="password" autocomplete="current-password" required placeholder="••••••••" />
         </label>
         <button class="btn btn-primary btn-block" type="submit">Enter ChimCode</button>
-      </form>
-
-      <form id="form-register" class="auth-form hidden">
-        <label>Username
-          <input name="username" autocomplete="username" required minlength="3" maxlength="20" placeholder="ada_lovelace" />
-        </label>
-        <label>Email
-          <input name="email" type="email" autocomplete="email" required placeholder="you@example.com" />
-        </label>
-        <label>Password
-          <input name="password" type="password" autocomplete="new-password" required minlength="8" placeholder="At least 8 characters" />
-        </label>
-        <button class="btn btn-primary btn-block" type="submit">Start learning free</button>
-        <p class="fineprint">You get 120 Books and a starter cosmetic set the moment you join.</p>
       </form>
       <p id="gate-error" class="form-error" role="alert"></p>
     </section>
@@ -149,6 +150,10 @@
     </div>
   </div>
 
+  <script src="/data/chimdata.js"></script>
+  <script src="/engine.js"></script>
+  <script src="/local.js"></script>
+  <script src="/api.js"></script>
   <script src="/bot.js"></script>
   <script src="/editor.js"></script>
   <script src="/app.js"></script>

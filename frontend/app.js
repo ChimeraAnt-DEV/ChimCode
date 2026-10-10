@@ -21,23 +21,11 @@
   };
 
   // ---------------------------------------------------------------- API
+  // ChimAPI picks a backend: fully local (no server needed) or an optional
+  // remote server. Same signature either way.
   async function api(path, opts) {
     opts = opts || {};
-    const headers = { "Content-Type": "application/json" };
-    if (state.token) headers["Authorization"] = "Bearer " + state.token;
-    const res = await fetch("/api" + path, {
-      method: opts.method || "GET",
-      headers,
-      body: opts.body ? JSON.stringify(opts.body) : undefined,
-    });
-    let data = null;
-    try { data = await res.json(); } catch (e) { data = {}; }
-    if (!res.ok) {
-      const err = new Error((data && data.detail) || "Request failed");
-      err.status = res.status;
-      throw err;
-    }
-    return data;
+    return window.ChimAPI.call(path, opts.method || "GET", opts.body);
   }
 
   // ---------------------------------------------------------------- toasts
@@ -161,6 +149,12 @@
   function render() {
     const view = $("#view");
     view.innerHTML = '<div class="spinner"></div>';
+    // Never leave the spinner up if a view throws or hangs.
+    const guard = setTimeout(() => {
+      if (view.querySelector(".spinner")) {
+        view.innerHTML = '<div class="empty"><span class="e-icon">⏳</span>Still loading… check your connection and try again.</div>';
+      }
+    }, 8000);
     const routes = {
       learn: renderLearn,
       community: renderCommunity,
@@ -168,9 +162,11 @@
       shop: renderShop,
       profile: renderProfile,
     };
-    (routes[state.route] || renderLearn)(view).catch((err) => {
-      view.innerHTML = '<div class="empty"><span class="e-icon">😵</span>Something went wrong: ' + escapeHtml(err.message) + "</div>";
-    });
+    Promise.resolve((routes[state.route] || renderLearn)(view))
+      .catch((err) => {
+        view.innerHTML = '<div class="empty"><span class="e-icon">😵</span>Something went wrong: ' + escapeHtml(err.message) + "</div>";
+      })
+      .finally(() => clearTimeout(guard));
   }
 
   // ================================================================ LEARN
@@ -970,38 +966,66 @@
     renderOnboardStep();
   }
 
+  function hasAnswer(step) {
+    const v = state.onboarding.answers[step.key];
+    if (step.multi) return Array.isArray(v) && v.length > 0;
+    return !!v;
+  }
+
   function renderOnboardStep() {
     const steps = ONBOARD_STEPS;
     const step = steps[state.onboarding.index];
     $("#onboard-kicker").textContent = "Question " + (state.onboarding.index + 1) + " of " + steps.length;
     $("#onboard-question").textContent = step.q;
     $("#onboard-helper").textContent = step.helper || "";
-    $("#onboard-progress").style.width = ((state.onboarding.index) / steps.length) * 100 + "%";
+    $("#onboard-progress").style.width = (state.onboarding.index / steps.length) * 100 + "%";
+
     const box = $("#onboard-options");
     box.innerHTML = "";
     const current = state.onboarding.answers[step.key];
+    const group = "onboard-" + step.key;
+
     step.options.forEach((opt) => {
-      const b = el("button", "option");
+      const label = el("label", "option");
       const selected = step.multi ? (current || []).includes(opt.v) : current === opt.v;
-      if (selected) b.classList.add("selected");
-      b.innerHTML = '<span class="o-icon">' + opt.i + '</span><span><span class="o-label">' + escapeHtml(opt.v) + "</span>" +
-        (opt.d ? '<span class="o-desc"> · ' + escapeHtml(opt.d) + "</span>" : "") + "</span>";
-      b.addEventListener("click", () => {
+      if (selected) label.classList.add("selected");
+
+      // A real radio (single choice) or checkbox (multi choice) control.
+      const input = document.createElement("input");
+      input.type = step.multi ? "checkbox" : "radio";
+      input.name = group;
+      input.value = opt.v;
+      input.checked = selected;
+      input.addEventListener("change", () => {
         if (step.multi) {
           const arr = state.onboarding.answers[step.key] || [];
-          const idx = arr.indexOf(opt.v);
-          if (idx >= 0) arr.splice(idx, 1); else arr.push(opt.v);
+          const i = arr.indexOf(opt.v);
+          if (input.checked && i < 0) arr.push(opt.v);
+          if (!input.checked && i >= 0) arr.splice(i, 1);
           state.onboarding.answers[step.key] = arr;
         } else {
           state.onboarding.answers[step.key] = opt.v;
         }
-        renderOnboardStep();
+        // Reflect selection styling and enable the Next button.
+        Array.from(box.children).forEach((child) => {
+          const cb = child.querySelector("input");
+          child.classList.toggle("selected", cb && cb.checked);
+        });
+        $("#onboard-next").disabled = !hasAnswer(step);
       });
-      box.appendChild(b);
+
+      label.appendChild(input);
+      const body = document.createElement("span");
+      body.innerHTML = '<span class="o-icon">' + opt.i + '</span><span>' +
+        '<span class="o-label">' + escapeHtml(opt.v) + "</span>" +
+        (opt.d ? '<span class="o-desc"> · ' + escapeHtml(opt.d) + "</span>" : "") + "</span>";
+      label.appendChild(body);
+      box.appendChild(label);
     });
+
     $("#onboard-back").style.visibility = state.onboarding.index === 0 ? "hidden" : "visible";
-    $("#onboard-next").disabled = !state.onboarding.answers[step.key] || (Array.isArray(state.onboarding.answers[step.key]) && !state.onboarding.answers[step.key].length);
-    $("#onboard-next").textContent = state.onboarding.index === steps.length - 1 ? "Start learning" : "Continue";
+    $("#onboard-next").disabled = !hasAnswer(step);
+    $("#onboard-next").textContent = state.onboarding.index === steps.length - 1 ? "Start learning" : "Next";
     state.onboardBot && state.onboardBot.setState("thinking");
   }
 
@@ -1053,12 +1077,13 @@
 
   async function afterAuth(token) {
     state.token = token;
-    localStorage.setItem("chimcode_token", token);
+    try { localStorage.setItem("chimcode_token", token); } catch (e) { /* ignore */ }
     try {
       state.me = await api("/me");
       await enterApp();
     } catch (e) {
-      state.token = ""; localStorage.removeItem("chimcode_token");
+      state.token = "";
+      try { localStorage.removeItem("chimcode_token"); } catch (err) { /* ignore */ }
       $("#gate-error").textContent = "Session could not be started.";
     }
   }
@@ -1079,6 +1104,9 @@
   }
 
   async function boot() {
+    // Pick a backend first: local (no server needed) or a reachable server.
+    try { await window.ChimAPI.boot(); } catch (e) { /* local always works */ }
+
     wireAuth();
     $$(".nav-link").forEach((b) => b.addEventListener("click", () => go(b.dataset.route)));
     $("#hud-avatar").addEventListener("click", () => go("profile"));
@@ -1087,8 +1115,12 @@
     state.onboardBot = new Mochi($("#bot-stage-onboard"), 240);
     initBotDock();
 
-    // heartbeat keeps online status fresh
-    setInterval(() => { if (state.token) api("/heartbeat", { method: "POST" }).catch(() => {}); }, 40000);
+    // heartbeat keeps online status fresh (no-op in local mode)
+    if (window.ChimAPI.mode === "server") {
+      setInterval(() => { if (state.token) api("/heartbeat", { method: "POST" }).catch(() => {}); }, 40000);
+    }
+
+    showModeBadge();
 
     try {
       const h = await api("/health");
@@ -1097,9 +1129,43 @@
       $("#stat-lessons").textContent = h.lessons;
     } catch (e) { /* offline ok */ }
 
-    if (state.token) {
-      try { state.me = await api("/me"); await enterApp(); }
-      catch (e) { state.token = ""; localStorage.removeItem("chimcode_token"); }
+    // Restore an existing session. In local mode the account lives on the
+    // device, so we always bring the user straight back in.
+    try {
+      state.me = await api("/me");
+      await enterApp();
+    } catch (e) {
+      if (window.ChimAPI.mode === "server") {
+        state.token = "";
+        try { localStorage.removeItem("chimcode_token"); } catch (err) { /* ignore */ }
+      }
+      showGate();
+    }
+  }
+
+  function showGate() {
+    $("#gate").classList.remove("hidden");
+    $("#onboarding").classList.add("hidden");
+    $("#app").classList.add("hidden");
+  }
+
+  function showModeBadge() {
+    const badge = $("#mode-badge");
+    const fineprint = $("#gate-fineprint");
+    if (window.ChimAPI.mode === "local") {
+      if (badge) {
+        badge.textContent = "✓ Ready offline — no server needed";
+        badge.classList.add("mode-local");
+        badge.classList.remove("hidden");
+      }
+      if (fineprint) fineprint.textContent = "Everything saves on this device. No server, no sign-up fees, no internet required.";
+    } else {
+      if (badge) {
+        badge.textContent = "● Connected to server";
+        badge.classList.add("mode-server");
+        badge.classList.remove("hidden");
+      }
+      if (fineprint) fineprint.textContent = "Connected to a ChimCode server, so your account works across devices.";
     }
   }
 

@@ -1,19 +1,25 @@
 # ChimCode for Android
 
-A native Android shell that wraps the ChimCode web app in a WebView and adds
-a **native Text-To-Speech bridge**, so Mochi's bot voice works on Android
-(the WebView `speechSynthesis` API is unreliable there).
+A native Android app that runs the **entire ChimCode web app offline**, with
+Mochi's voice bridged to the native Android TextToSpeech engine.
+
+**No server. No sign-up fees. No internet required.** The whole curriculum, all
+707 achievements and the full UI ship inside the APK, and your progress is
+saved on the device.
 
 - Kotlin + AndroidX, `minSdk 24`, `targetSdk 34`
+- Web app bundled under `assets/www` (copied from `frontend/` at build time)
 - Native `TextToSpeech` exposed to the page as `window.ChimVoice`
-- In-app server address setup screen
+- Progress and account stored in the WebView's `localStorage`
 - Adaptive launcher icons generated from the shared icon renderer
+- Optional advanced setting to point at a ChimCode server instead
 
 ## Build it yourself
 
 You need **JDK 17+** and the **Android SDK** (platform 34, build-tools 34.0.0).
 
 ```bash
+python3 tools/export_static_data.py     # refresh frontend/data/chimdata.js
 cd android
 echo "sdk.dir=$ANDROID_HOME" > local.properties
 ./gradlew assembleDebug
@@ -43,18 +49,17 @@ APK. Or use adb:
 adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
-## Run it
+## How it works
 
-The app needs to reach a running ChimCode server:
+The app opens the bundled `file:///android_asset/www/index.html`. On load, the
+frontend detects that it is running standalone and switches to its local
+backend, which implements the whole API in the browser and persists to
+`localStorage`. Nothing leaves the device.
 
-1. On your computer, start the server: `./run.sh` from the repo root.
-2. Find the address your phone can reach:
-   - **Android emulator:** `http://10.0.2.2:12000` (already the default button)
-   - **Physical device on the same Wi-Fi:** `http://<your-computer-ip>:12000`
-3. Open the app and enter that address on the connect screen.
-
-`usesCleartextTraffic` is enabled so plain `http://` LAN addresses work. For a
-public deployment, put the server behind HTTPS.
+An optional **Advanced: server connection** menu (the ⚙ button) lets you point
+at a running ChimCode server instead — see the main README — for a shared
+account across devices. Leave it on *Use offline only* and everything just
+works.
 
 ## Regenerate the launcher icons
 

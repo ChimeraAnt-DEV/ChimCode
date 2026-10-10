@@ -1,4 +1,3 @@
-# Android build output (patterns are relative to this android/ directory)
 app/build/
 build/
 .gradle/
@@ -8,6 +7,9 @@ captures/
 *.aab
 *.ap_
 *.dex
+
+# Bundled web assets are copied in at build time
+app/src/main/assets/www/
 
 # Keystores and signing material must never be committed
 *.keystore
