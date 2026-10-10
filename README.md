@@ -16,6 +16,7 @@ named **Mochi** who hovers over your mistakes and explains exactly what to fix.
 [![License](https://img.shields.io/badge/license-MIT-f472b6?style=for-the-badge)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776ab?style=for-the-badge&logo=python&logoColor=white)](.)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](.)
+[![Android APK](https://img.shields.io/badge/Android-APK-3ddc84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/ChimeraAnt-DEV/ChimCode/releases/latest)
 
 </div>
 
@@ -88,8 +89,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 12000
 A native Android app is included in [`android/`](android). It wraps ChimCode in
 a WebView and adds **native Text-To-Speech**, so Mochi's voice works on Android.
 
-**Download the APK** from the [**Releases page**](../../releases) — grab
-`chimcode-1.0.0-android.apk`, enable *Install unknown apps*, and open it.
+**Download the APK** — [**chimcode-1.0.0-android.apk**](https://github.com/ChimeraAnt-DEV/ChimCode/releases/download/android-v1.0.0/chimcode-1.0.0-android.apk)
+(4.6 MB, signed, Android 7.0+). Open it, allow *Install unknown apps*, install.
 
 **Build it yourself:**
 
