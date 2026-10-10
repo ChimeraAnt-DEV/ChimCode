@@ -34,6 +34,7 @@
     eye: '<path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.7"/>',
     robot: '<rect x="4" y="8" width="16" height="11" rx="3"/><path d="M12 4v4"/><circle cx="12" cy="3" r="1.3"/><circle cx="9" cy="13" r="1.4"/><circle cx="15" cy="13" r="1.4"/><path d="M10 16.5h4"/>',
     play: '<path d="M8 5.5 19 12 8 18.5z"/>',
+    redo: '<path d="M20 11a8 8 0 1 0-2.3 6.4"/><path d="M20 5v6h-6"/>',
     timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9.5V13l2.5 1.6"/><path d="M9.5 2.5h5"/>',
     target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.6"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/>',
     crown: '<path d="M4 17 3 7l5 3 4-6 4 6 5-3-1 10z"/><path d="M4 17h16"/>',

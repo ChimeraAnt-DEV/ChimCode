@@ -38,7 +38,7 @@ LESSONS: list[Lesson] = [
             explanation="Python uses print() for output.",
         ),
         challenge="Print your own name on a second line.",
-        challenge_starter='print("Hello, ChimCode!")\n',
+        challenge_starter='# Keep the line below, then add a second print for your name\nprint("Hello, ChimCode!")\n',
         tags=["basics"],
     ),
     _l(

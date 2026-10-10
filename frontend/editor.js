@@ -17,7 +17,6 @@
       this.ghost = null;
       this.bot = null;
       this.build();
-      if (this.opts.starter) this.setValue(this.opts.starter);
     }
 
     build() {
@@ -47,6 +46,11 @@
       this.area.addEventListener("keydown", (e) => this.onKey(e));
       areaWrap.appendChild(this.area);
 
+      // Grayed-out starter shown behind the real input. It disappears the
+      // moment the user types, so it can never be edited or deleted.
+      this.placeholderEl = el("div", "code-placeholder");
+      areaWrap.appendChild(this.placeholderEl);
+
       // overlays
       this.markerLayer = el("div", "marker-layer");
       this.markerLayer.style.cssText = "position:absolute;inset:0;pointer-events:none;";
@@ -66,7 +70,26 @@
       this.hintBar = el("div", "ghost-hint-bar hidden");
       this.container.appendChild(this.hintBar);
 
+      this.setPlaceholder(this.opts.starter || "");
       this.onInput();
+    }
+
+    /** Show hint text behind the input. Never inserted into the value. */
+    setPlaceholder(text) {
+      this.placeholderText = text || "";
+      this.placeholderEl.textContent = this.placeholderText;
+      this.updatePlaceholder();
+    }
+
+    updatePlaceholder() {
+      const show = this.placeholderText && this.area.value.length === 0;
+      this.placeholderEl.classList.toggle("hidden", !show);
+      if (show) {
+        const lines = this.placeholderText.split("\n").length;
+        let out = "";
+        for (let i = 1; i <= lines; i++) out += i + "\n";
+        this.nums.textContent = out;
+      }
     }
 
     onKey(e) {
@@ -104,6 +127,7 @@
 
     onInput() {
       this.updateLineNumbers();
+      this.updatePlaceholder();
       if (this.opts.onChange) this.opts.onChange(this.getValue());
     }
 
@@ -149,7 +173,9 @@
       if (this.opts.onMistake) this.opts.onMistake(issue);
     }
 
-    // Transparent text that shows what to type next.
+    // Transparent text that shows what to type next. Characters the user has
+    // already typed are removed from the front so the hint only ever shows the
+    // part that is still missing.
     showGhost(ghost) {
       this.ghost = ghost;
       if (!ghost || !ghost.text) {
@@ -160,16 +186,39 @@
       const lines = this.getValue().split("\n");
       const lastLine = lines.length;
       const lastText = lines[lastLine - 1] || "";
+
+      // Trim whatever the user has already typed. We look for the longest
+      // suffix of the current line that is also a prefix of the hint, so
+      // typing "Hel" turns "Hello, ChimCode!" into "lo, ChimCode!".
+      let remaining = ghost.text;
+      const typed = lastText;
+      let best = 0;
+      for (let start = typed.length; start >= 0; start -= 1) {
+        const tail = typed.slice(start);
+        let j = 0;
+        while (j < tail.length && j < remaining.length && tail[j] === remaining[j]) j += 1;
+        if (j > best) best = j;
+      }
+      remaining = remaining.slice(best);
+
+      if (!remaining) {
+        this.ghostEl.classList.add("hidden");
+        this.hintBar.innerHTML =
+          '<span class="h-with-ic">' + window.icon("check", 15) + escapeHtml(ghost.message) + "</span>";
+        this.hintBar.classList.remove("hidden");
+        return;
+      }
+
       const top = PAD_TOP + (lastLine - 1) * LINE_HEIGHT - this.area.scrollTop;
-      const left = 14 + measure(lastText);
-      this.ghostEl.textContent = ghost.text;
+      const left = 14 + measure(lastText.replace(/\s+$/, ""));
+      this.ghostEl.textContent = remaining;
       this.ghostEl.style.top = top + "px";
       this.ghostEl.style.left = left + "px";
       this.ghostEl.classList.remove("hidden");
 
       this.hintBar.innerHTML =
         '<span class="h-with-ic">' + window.icon("bulb", 15) + escapeHtml(ghost.message) + "</span>" +
-        '<span class="ghost-snippet">' + escapeHtml(ghost.text) + "</span>";
+        '<span class="ghost-snippet">' + escapeHtml(remaining) + "</span>";
       this.hintBar.classList.remove("hidden");
     }
 

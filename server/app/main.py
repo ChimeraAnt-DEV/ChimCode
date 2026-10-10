@@ -439,29 +439,57 @@ def analyze_only(body: BotIn, user: dict = Depends(current_user)):
     return engine.grade(lesson, body.code)
 
 
+def _normalise(code: str) -> str:
+    return " ".join(str(code or "").replace("\r\n", "\n").split())
+
+
+def _challenge_valid(lesson, code: str) -> bool:
+    """A challenge must be a real attempt, not the starter or the example."""
+    norm = _normalise(code)
+    if not norm:
+        return False
+    for scaffold in (lesson.challenge_starter, lesson.example, lesson.starter):
+        if scaffold and norm == _normalise(scaffold):
+            return False
+    return True
+
+
 @app.post("/api/challenge")
 def challenge(body: SubmitIn, user: dict = Depends(current_user)):
     lesson = find_lesson(body.lesson_id)
     if not lesson:
         raise HTTPException(404, "Unknown lesson")
     report = engine.grade(lesson, body.code)
+    valid = _challenge_valid(lesson, body.code)
+    rewards = {"books": 0, "xp": 0, "repeated": False, "needsChange": False, "newAchievements": []}
     with db() as conn:
         touch(user["id"])
-        if report["passed"]:
+        prev = conn.execute(
+            "SELECT status FROM lesson_progress WHERE user_id = ? AND lesson_id = ?",
+            (user["id"], lesson.id),
+        ).fetchone()
+        already_paid = bool(prev and prev["status"] == "challenged")
+        if report["passed"] and valid:
             conn.execute(
                 "INSERT INTO lesson_progress (user_id, lesson_id, language, status, best_score, updated_at) "
                 "VALUES (?, ?, ?, 'challenged', ?, ?) ON CONFLICT(user_id, lesson_id) DO UPDATE SET "
                 "status = 'challenged', best_score = MAX(best_score, excluded.best_score), updated_at = excluded.updated_at",
                 (user["id"], lesson.id, lesson.language, report["score"], now()),
             )
-            add_books(conn, user["id"], 45)
-            conn.execute("UPDATE users SET xp = xp + 120 WHERE id = ?", (user["id"],))
-            bump_stat(conn, user["id"], "xp", 120)
-            bump_stat(conn, user["id"], "challenges_completed", 1)
-            log_activity(conn, user["id"], "challenge", f"beat the challenge for {lesson.title}")
-        newly = evaluate_achievements(conn, user["id"])
-    return {**report, "rewards": {"books": 45 if report["passed"] else 0, "xp": 120 if report["passed"] else 0,
-                                  "newAchievements": newly}}
+            if already_paid:
+                rewards["repeated"] = True
+            else:
+                rewards["books"] = 45
+                rewards["xp"] = 120
+                add_books(conn, user["id"], 45)
+                conn.execute("UPDATE users SET xp = xp + 120 WHERE id = ?", (user["id"],))
+                bump_stat(conn, user["id"], "xp", 120)
+                bump_stat(conn, user["id"], "challenges_completed", 1)
+                log_activity(conn, user["id"], "challenge", f"beat the challenge for {lesson.title}")
+        elif report["passed"] and not valid:
+            rewards["needsChange"] = True
+        rewards["newAchievements"] = evaluate_achievements(conn, user["id"])
+    return {**report, "rewards": rewards}
 
 
 @app.post("/api/quiz")

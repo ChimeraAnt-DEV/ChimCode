@@ -249,14 +249,30 @@
 
     const list = el("div", "grid");
     list.style.gap = "12px";
+    state.lessonList = lang.lessons;
     lang.lessons.forEach((lesson, i) => {
-      const row = el("div", "lesson-row" + (done[lesson.id] === "completed" ? " done" : ""));
+      const isDone = done[lesson.id] === "completed" || done[lesson.id] === "challenged";
+      const row = el("div", "lesson-row" + (isDone ? " done" : ""));
       row.innerHTML =
-        '<div class="lr-index">' + (done[lesson.id] === "completed" ? ic("check",16) : i + 1) + "</div>" +
+        '<div class="lr-index">' + (isDone ? ic("check", 16) : i + 1) + "</div>" +
         '<div class="lr-body"><div class="lr-title">' + escapeHtml(lesson.title) + "</div>" +
         '<div class="lr-concept">' + escapeHtml(lesson.concept) + "</div></div>" +
         '<span class="chip level-' + lesson.level + '">' + lesson.level + "</span>" +
         '<div class="lr-min">' + lesson.minutes + " min</div>";
+      const actions = el("div", "lr-row-actions");
+      if (isDone) {
+        const circle = el("span", "check-circle");
+        circle.innerHTML = ic("check", 18);
+        circle.title = "Completed";
+        actions.appendChild(circle);
+        const redo = el("button", "btn btn-sm btn-ghost btn-redo");
+        redo.innerHTML = ic("redo", 14) + "Redo";
+        redo.title = "Practice again — no extra rewards";
+        redo.addEventListener("click", (e) => { e.stopPropagation(); openLesson(lesson.id, true); });
+        actions.appendChild(redo);
+      }
+      actions.addEventListener("click", (e) => e.stopPropagation());
+      row.appendChild(actions);
       row.addEventListener("click", () => openLesson(lesson.id));
       list.appendChild(row);
     });
@@ -349,12 +365,9 @@
       const ch = el("div", "card");
       ch.style.marginTop = "18px";
       ch.innerHTML = "<b class=\"h-with-ic\">" + ic("puzzle",16) + "Challenge</b><p>" + escapeHtml(lesson.challenge) + "</p>";
-      const chBtn = el("button", "btn btn-gold btn-sm"); chBtn.textContent = "Attempt challenge";
-      chBtn.addEventListener("click", () => {
-        const code = prompt("Write your challenge solution:\n" + lesson.challenge, lesson.challengeStarter || "");
-        if (code == null) return;
-        submitChallenge(lesson.id, code, results);
-      });
+      const chBtn = el("button", "btn btn-gold btn-sm");
+      chBtn.innerHTML = ic("puzzle", 15) + "Attempt challenge";
+      chBtn.addEventListener("click", () => openChallengeModal(lesson, results));
       ch.appendChild(chBtn);
       right.appendChild(ch);
     }
@@ -435,25 +448,156 @@
       renderResults(results, r);
       state.bot.setState(r.passed ? "happy" : "sad");
       state.bot.talk(1800);
-      if (r.passed) {
-        mochiVoice.speak("That is correct. Nicely done.");
-        toast("check", "Lesson complete!", "+" + r.rewards.books + " Books · +" + r.rewards.xp + " XP", "good");
-      } else {
-        toast("puzzle", "Keep going", r.passed ? "" : "Mochi marked what to fix.", "bad");
-      }
       celebrate(r.rewards.newAchievements);
       state.me = await api("/me");
       refreshHud();
+      if (r.passed) {
+        mochiVoice.speak("That is correct. Nicely done.");
+        showCompletion(lesson, r, false);
+      } else {
+        toast("puzzle", "Keep going", "Mochi marked what to fix.", "bad");
+      }
     } catch (e) { toast("alert", "Could not check", e.message, "bad"); }
   }
 
-  async function submitChallenge(lessonId, code, results) {
+  // Animated check + reward payout, then an option to continue or review.
+  function showCompletion(lesson, r, isChallenge) {
+    const rewards = r.rewards || {};
+    const overlay = el("div", "done-overlay");
+    const card = el("div", "done-card glass");
+    const first = !rewards.repeated;
+
+    const title = isChallenge ? "Challenge beaten" : "Lesson complete";
+    card.innerHTML =
+      '<div class="check-burst">' +
+      '<svg viewBox="0 0 120 120"><circle class="disc" cx="60" cy="60" r="46"/>' +
+      '<circle class="ring" cx="60" cy="60" r="52"/>' +
+      '<path class="tick" d="M38 62 L54 78 L84 46"/></svg>' +
+      "</div>" +
+      "<h2 style='margin:0'>" + title + "</h2>" +
+      "<p>" + escapeHtml(lesson.title) + "</p>";
+
+    if (first && (rewards.books || rewards.xp)) {
+      const row = el("div", "reward-row");
+      if (rewards.books) {
+        const b = el("div", "reward-chip books");
+        b.innerHTML = ic("book", 20) + "+" + rewards.books;
+        row.appendChild(b);
+      }
+      if (rewards.xp) {
+        const x = el("div", "reward-chip xp delay-1");
+        x.innerHTML = ic("bolt", 20) + "+" + rewards.xp;
+        row.appendChild(x);
+      }
+      card.appendChild(row);
+      // Floating coin flourish.
+      for (let i = 0; i < 6; i++) {
+        const f = el("span", "float-book");
+        f.innerHTML = ic("book", 20);
+        f.style.left = 30 + Math.random() * 60 + "%";
+        f.style.top = "52%";
+        f.style.animationDelay = (0.2 + i * 0.12) + "s";
+        card.appendChild(f);
+      }
+    } else {
+      const note = el("p", "reward-note");
+      note.textContent = rewards.repeated
+        ? "Practice run — rewards are only given the first time."
+        : "Nicely done.";
+      card.appendChild(note);
+    }
+
+    if (r.rewards && r.rewards.newAchievements && r.rewards.newAchievements.length) {
+      const ach = el("p", "reward-note");
+      ach.textContent = "+" + r.rewards.newAchievements.length + " achievement" +
+        (r.rewards.newAchievements.length > 1 ? "s" : "") + " unlocked";
+      card.appendChild(ach);
+    }
+
+    const actions = el("div", "done-actions");
+    const next = nextLessonAfter(lesson.id);
+    if (next) {
+      const nb = el("button", "btn btn-primary");
+      nb.innerHTML = ic("play", 15) + "Continue to next lesson";
+      nb.addEventListener("click", () => { closeModal(); openLesson(next.id); });
+      actions.appendChild(nb);
+    }
+    const again = el("button", "btn btn-ghost");
+    again.innerHTML = ic("redo", 15) + "Practice again";
+    again.addEventListener("click", () => { closeModal(); openLesson(lesson.id, true); });
+    actions.appendChild(again);
+    const review = el("button", "btn btn-ghost");
+    review.textContent = "Stay here";
+    review.addEventListener("click", closeModal);
+    actions.appendChild(review);
+
+    card.appendChild(actions);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+    mochiVoice.speak(first ? "Correct. Here are your rewards." : "Nice practice run.");
+  }
+
+  function nextLessonAfter(lessonId) {
+    const all = state.lessonList || [];
+    const idx = all.findIndex((l) => l.id === lessonId);
+    if (idx >= 0 && idx + 1 < all.length) return all[idx + 1];
+    return null;
+  }
+
+  // A proper editor inside a modal, replacing the old native prompt().
+  function openChallengeModal(lesson, results) {
+    const backdrop = el("div", "modal-backdrop challenge-modal");
+    const box = el("div", "modal glass");
+    const head = el("div", "modal-head");
+    head.innerHTML = "<h3 style='margin:0'>Challenge</h3>";
+    const close = el("button", "icon-btn");
+    close.innerHTML = ic("x", 16);
+    close.addEventListener("click", () => backdrop.remove());
+    head.appendChild(close);
+    box.appendChild(head);
+    box.appendChild(pEl(lesson.challenge));
+
+    const host = el("div");
+    box.appendChild(host);
+    const editor = new CodeEditor(host, {
+      language: lesson.language,
+      starter: lesson.challengeStarter || "",
+      fileName: "challenge_" + fileNameFor(lesson),
+    });
+
+    const out = el("div");
+    out.style.marginTop = "14px";
+    box.appendChild(out);
+    const actions = el("div");
+    actions.style.cssText = "display:flex;gap:10px;margin-top:14px;flex-wrap:wrap";
+    const run = el("button", "btn btn-gold");
+    run.innerHTML = ic("puzzle", 15) + "Submit challenge";
+    run.addEventListener("click", () => submitChallenge(lesson.id, editor.getValue(), out, backdrop));
+    actions.appendChild(run);
+    box.appendChild(actions);
+
+    backdrop.appendChild(box);
+    backdrop.addEventListener("click", (e) => { if (e.target === backdrop) backdrop.remove(); });
+    document.body.appendChild(backdrop);
+    editor.focus();
+  }
+
+  async function submitChallenge(lessonId, code, results, backdrop) {
     try {
       const r = await api("/challenge", { method: "POST", body: { lesson_id: lessonId, code } });
       renderResults(results, r, true);
-      if (r.passed) toast("puzzle", "Challenge beaten!", "+45 Books · +120 XP", "good");
       celebrate(r.rewards.newAchievements);
-      state.me = await api("/me"); refreshHud();
+      state.me = await api("/me");
+      refreshHud();
+      if (r.rewards && r.rewards.needsChange) {
+        toast("alert", "Change the code first", "Write your own solution — not the starter or the example.", "bad");
+      } else if (r.passed) {
+        if (backdrop) backdrop.remove();
+        const lesson = state.lesson;
+        showCompletion(lesson, r, true);
+      } else {
+        toast("puzzle", "Not yet", "Mochi marked what to fix.", "bad");
+      }
     } catch (e) { toast("alert", "Challenge error", e.message, "bad"); }
   }
 
@@ -887,7 +1031,10 @@
     backdrop.addEventListener("click", (e) => { if (e.target === backdrop) closeModal(); });
     document.body.appendChild(backdrop);
   }
-  function closeModal() { $$(".modal-backdrop").forEach((m) => m.remove()); }
+  function closeModal() {
+    $$(".modal-backdrop").forEach((m) => m.remove());
+    $$(".done-overlay").forEach((m) => m.remove());
+  }
 
   function pEl(text) { const p = el("p"); p.textContent = text; return p; }
   function el(tag, cls) { const e = document.createElement(tag); if (cls) e.className = cls; return e; }
@@ -1104,6 +1251,10 @@
   async function enterApp() {
     refreshHud();
     const ob = await api("/onboarding");
+    // The offline/server badge is a pre-login hint only. Once inside the app
+    // it disappears so it never lingers over the UI.
+    const badge = $("#mode-badge");
+    if (badge) badge.classList.add("hidden");
     if (!ob.completed) {
       $("#gate").classList.add("hidden");
       $("#onboarding").classList.remove("hidden");

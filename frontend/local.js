@@ -332,19 +332,43 @@
   }
 
   // ------------------------------------------------------------- learning
+  function normalise(code) {
+    return String(code || "").replace(/\r\n/g, "\n").replace(/[ \t]+/g, " ").trim();
+  }
+
   function submitLesson(b, isChallenge) {
     requireUser();
     const lesson = LESSON_INDEX[b.lesson_id];
     if (!lesson) throw httpError(404, "Unknown lesson");
-    const report = E.grade(lesson, b.code || "");
+    const code = b.code || "";
+    const report = E.grade(lesson, code);
     const today = dayKey();
 
-    const prev = S.progress[lesson.id];
-    const best = Math.max(report.score, prev ? prev.best_score : 0);
-    const status = report.passed ? (isChallenge ? "challenged" : "completed") : "in_progress";
+    const prev = S.progress[lesson.id] || {};
+    const best = Math.max(report.score, prev.best_score || 0);
+    const status = report.passed ? (isChallenge ? "challenged" : "completed") : prev.status || "in_progress";
+
+    // One reward per lesson per track. Re-running an already-paid lesson is
+    // free practice and pays nothing, so it cannot be farmed for Books.
+    const paid = !!prev.challenge_paid;
+    const lessonPaid = !!prev.lesson_paid;
+
+    // A challenge must be a real attempt: not empty, not the starter
+    // scaffolding, and different from the worked example.
+    let challengeValid = true;
+    if (isChallenge) {
+      const norm = normalise(code);
+      const starterNorm = normalise(lesson.challengeStarter || "");
+      const exampleNorm = normalise(lesson.example || "");
+      const starterNorm2 = normalise(lesson.starter || "");
+      challengeValid = norm.length > 0 && norm !== starterNorm && norm !== exampleNorm && norm !== starterNorm2;
+    }
+
     S.progress[lesson.id] = {
       lesson_id: lesson.id, language: lesson.language, status,
       best_score: best, updated_at: Math.floor(Date.now() / 1000),
+      lesson_paid: lessonPaid || (report.passed && !isChallenge && challengeValid),
+      challenge_paid: paid || (report.passed && isChallenge && challengeValid),
     };
 
     if (b.hints_used) bump("hints_used", b.hints_used); else bump("no_hint_lessons");
@@ -352,14 +376,26 @@
     const hour = new Date().getHours();
     if (hour < 5) bump("night_sessions"); else if (hour < 7) bump("morning_sessions");
 
-    let reward = { books: 0, xp: 0, newAchievements: [] };
-    const firstTime = !prev || (prev.status !== "completed" && prev.status !== "challenged");
+    const reward = { books: 0, xp: 0, repeated: false, needsChange: false, newAchievements: [] };
     if (report.passed) {
       if (today !== S.lastDay) {
         S.user.streak = (S.user.streak || 0) + 1;
         S.lastDay = today;
       }
-      if (firstTime && !isChallenge) {
+      if (isChallenge) {
+        if (!challengeValid) {
+          reward.needsChange = true;
+        } else if (!paid) {
+          reward.books = 45;
+          reward.xp = 120;
+          addBooks(45);
+          S.user.xp += 120;
+          bump("xp", 120);
+          logActivity("challenge", "beat the challenge for " + lesson.title);
+        } else {
+          reward.repeated = true;
+        }
+      } else if (!lessonPaid) {
         reward.books = 20 + lesson.minutes;
         reward.xp = 50 + lesson.minutes * 5;
         addBooks(reward.books);
@@ -367,10 +403,8 @@
         bump("xp", reward.xp);
         if (report.score >= 100) bump("perfect_scores");
         logActivity("lesson", "completed " + lesson.title);
-      } else if (isChallenge) {
-        reward.books = 45; reward.xp = 120;
-        addBooks(45); S.user.xp += 120; bump("xp", 120);
-        logActivity("challenge", "beat the challenge for " + lesson.title);
+      } else {
+        reward.repeated = true;
       }
     }
     reward.newAchievements = evaluateAchievements();

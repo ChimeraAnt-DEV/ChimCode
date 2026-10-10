@@ -220,7 +220,7 @@
   }
 
   function referenceSolution(lesson) {
-    const candidates = [lesson.example, lesson.challengeStarter];
+    const candidates = [lesson.example];
     for (const c of candidates) {
       if (c && (lesson.checks || []).every((ch) => checkOk(ch, c)[0])) return c;
     }

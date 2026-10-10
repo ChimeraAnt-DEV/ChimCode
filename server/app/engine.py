@@ -345,8 +345,6 @@ def walkthrough(lesson) -> dict[str, Any]:
 def _reference_solution(lesson) -> str:
     """Best-effort reference answer, preferring the lesson example when it satisfies checks."""
     candidates = [lesson.example]
-    if lesson.challenge_starter:
-        candidates.append(lesson.challenge_starter)
     for candidate in candidates:
         if candidate and all(_check_ok(c, candidate)[0] for c in lesson.checks):
             return candidate

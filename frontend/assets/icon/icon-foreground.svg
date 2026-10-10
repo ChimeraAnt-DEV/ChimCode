@@ -1,5 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
-  <!-- Adaptive-icon foreground: transparent, mark inside the 72dp safe zone. -->
+  <!-- Adaptive-icon foreground. Android masks the outer shape and may crop
+       anything outside the central 72dp safe zone, so the mark is scaled to
+       fit ~62dp and centred on the 108dp canvas. -->
   <defs>
     <linearGradient id="visor" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#12122A"/>
@@ -10,14 +12,15 @@
       <stop offset="1" stop-color="#22D3EE"/>
     </linearGradient>
     <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
-      <feGaussianBlur stdDeviation="2.4" result="b"/>
+      <feGaussianBlur stdDeviation="1.6" result="b"/>
       <feMerge>
         <feMergeNode in="b"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
   </defs>
-  <g transform="translate(54 55) scale(0.62) translate(-256 -256)">
+  <!-- Centre the mark (bounds ~288x309, centre ~(256,211)) then scale to ~62dp. -->
+  <g transform="translate(54 54) scale(0.205) translate(-256 -211)">
     <line x1="256" y1="96" x2="256" y2="150" stroke="#E8ECFF" stroke-width="15" stroke-linecap="round"/>
     <circle cx="256" cy="78" r="21" fill="#FFC94D" filter="url(#glow)"/>
     <rect x="112" y="150" width="288" height="216" rx="76" fill="url(#visor)"/>

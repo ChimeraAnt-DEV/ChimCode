@@ -39,8 +39,36 @@
       this.blink = 0;
       this.nextBlink = 60 + Math.random() * 120;
       this.raf = null;
+      this.running = false;
+      this.visible = true;
       this.loop = this.loop.bind(this);
+      // Only animate while the canvas is actually on screen. Several Mochi
+      // instances used to each run a 60fps loop forever, which caused lag.
+      if (typeof IntersectionObserver !== "undefined") {
+        this.observer = new IntersectionObserver((entries) => {
+          this.visible = entries.some((e) => e.isIntersecting);
+          this.start();
+          this.stop();
+          if (this.visible) this.start();
+        }, { rootMargin: "60px" });
+        this.observer.observe(container);
+      }
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) this.stop(); else if (this.visible) this.start();
+      });
+      this.start();
+    }
+
+    start() {
+      if (this.running || !this.visible || (typeof document !== "undefined" && document.hidden)) return;
+      this.running = true;
       this.raf = requestAnimationFrame(this.loop);
+    }
+
+    stop() {
+      this.running = false;
+      if (this.raf) cancelAnimationFrame(this.raf);
+      this.raf = null;
     }
 
     setState(state) {
@@ -53,6 +81,7 @@
     }
 
     loop() {
+      if (!this.running) return;
       this.t += 1;
       if (this.talkUntil && performance.now() > this.talkUntil) {
         this.talkUntil = null;
@@ -63,7 +92,8 @@
     }
 
     destroy() {
-      if (this.raf) cancelAnimationFrame(this.raf);
+      this.stop();
+      if (this.observer) this.observer.disconnect();
     }
 
     draw() {

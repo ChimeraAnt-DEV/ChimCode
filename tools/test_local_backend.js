@@ -102,6 +102,37 @@ function call(p, m, b) { return L.call(p, m || "GET", b); }
   const me2 = await call("/me");
   check("avatar equipped shows in profile", me2.equipped.avatar === "ava-neon");
 
+    // ---- exploit regression: challenges cannot be farmed for Books ----
+  // Lesson 1 challenge starter is not the answer; submitting it must be refused.
+  const l1 = await call("/lessons/py-hello");
+  const beforeExploit = (await call("/me")).books;
+  const refused = await call("/challenge", "POST", { lesson_id: "py-hello", code: l1.challengeStarter });
+  check("challenge rejects unchanged starter", refused.rewards.needsChange === true && refused.rewards.books === 0,
+    JSON.stringify(refused.rewards));
+
+  // A real, distinct solution pays out once.
+  const realSolution = '# add a second line\nprint("Hello, ChimCode!")\nprint("Tester")';
+  const firstChallenge = await call("/challenge", "POST", { lesson_id: "py-hello", code: realSolution });
+  const afterFirst = (await call("/me")).books;
+  check("challenge pays on first real solve", firstChallenge.rewards.books === 45 && afterFirst >= beforeExploit + 45,
+    `reward ${firstChallenge.rewards.books}, books ${beforeExploit} -> ${afterFirst}`);
+
+  // Re-submitting the identical solution many times must pay nothing more.
+  let farmed = 0;
+  for (let i = 0; i < 5; i++) {
+    const again = await call("/challenge", "POST", { lesson_id: "py-hello", code: realSolution });
+    farmed += again.rewards.books;
+  }
+  const afterFarm = (await call("/me")).books;
+  check("challenge cannot be farmed", farmed === 0 && afterFarm === afterFirst, `farmed ${farmed}, books ${afterFarm}`);
+
+  // Re-running a completed lesson must also pay nothing.
+  const beforeRepeat = (await call("/me")).books;
+  const repeat = await call("/submit", "POST", { lesson_id: "py-hello", code: 'print("Hello, ChimCode!")' });
+  const afterRepeat = (await call("/me")).books;
+  check("completed lesson re-run pays nothing", repeat.rewards.books === 0 && afterRepeat === beforeRepeat,
+    `books ${beforeRepeat} -> ${afterRepeat}`);
+
   // super day (lower the bar not needed: 170 books >= 250? no) -> give books via lessons
   const before = (await call("/me")).books;
   let sdErr = null;
