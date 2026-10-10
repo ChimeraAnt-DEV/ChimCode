@@ -20,10 +20,38 @@ from app.config import SUPER_DAY_COST  # noqa: E402
 from app.curriculum.registry import LANGUAGES, LESSON_INDEX  # noqa: E402
 
 
+def _language_icon(lang_id: str) -> str:
+    """Map each language to a vector icon name (no emoji)."""
+    return {
+        "python": "code", "cpp": "settings", "javascript": "bolt",
+        "typescript": "code", "java": "server", "csharp": "target",
+        "go": "heartbeat", "rust": "settings", "sql": "db",
+        "bash": "terminal", "htmlcss": "palette",
+    }.get(lang_id, "code")
+
+
+# Achievement icons scale with rarity, so the trophy case reads at a glance.
+_RARITY_ICON = {"common": "flag", "rare": "medal", "epic": "trophy", "legendary": "crown"}
+
+
+def _achievement_icon(category: str, rarity: str) -> str:
+    return {
+        "milestone": "flag", "mastery": "medal", "social": "handshake",
+        "collection": "gem", "superday": "star", "special": "sparkle",
+    }.get(category, _RARITY_ICON[rarity])
+
+
+_SHOP_ICON = {
+    "avatar": "robot", "frame": "frame", "effect": "sparkle",
+    "overlay": "layers", "theme": "palette", "banner": "image",
+}
+
+
 def build() -> dict:
     languages = []
     for lang in LANGUAGES.values():
         data = lang.public(include_lessons=True)
+        data["icon"] = _language_icon(lang.id)
         # full() adds checks and includes the quiz; add the correct index for grading.
         data["lessons"] = [lesson.full() for lesson in lang.lessons]
         for lesson, full in zip(lang.lessons, data["lessons"]):
@@ -31,20 +59,49 @@ def build() -> dict:
                 full["quiz"]["answer"] = lesson.quiz.answer
         languages.append(data)
 
+    achievements = []
+    for a in ach.ACHIEVEMENTS:
+        item = a.public()
+        item["icon"] = _achievement_icon(a.category, a.rarity)
+        achievements.append(item)
+
+    categories = []
+    for c in ach.categories():
+        c = dict(c)
+        c["icon"] = {
+            "milestone": "flag", "mastery": "medal", "social": "handshake",
+            "collection": "gem", "superday": "star", "special": "sparkle",
+        }.get(c["id"], _language_icon(c["id"]))
+        categories.append(c)
+
+    items = []
+    for item in shop.ITEMS:
+        data = item.public()
+        data["icon"] = _SHOP_ICON.get(item.slot, "gem")
+        items.append(data)
+    grouped: dict[str, list] = {s: [] for s in shop.SLOTS}
+    for item in items:
+        grouped.setdefault(item["slot"], []).append(item)
+    shop_payload = {"slots": shop.SLOTS, "items": items, "grouped": grouped}
+
     return {
         "config": {"superDayCost": SUPER_DAY_COST},
         "languages": languages,
-        "achievements": [a.public() for a in ach.ACHIEVEMENTS],
+        "achievements": achievements,
         "achievementTotal": ach.TOTAL_ACHIEVEMENTS,
-        "achievementCategories": ach.categories(),
+        "achievementCategories": categories,
         "achCategoryMeta": {
-            k: {"name": v[0], "icon": v[1], "color": v[2]}
+            k: {"name": v[0], "icon": {
+                "milestone": "flag", "mastery": "medal", "social": "handshake",
+                "collection": "gem", "superday": "star", "special": "sparkle",
+            }.get(k, _language_icon(k)), "color": v[2]}
             for k, v in ach.CATEGORY_META.items()
         },
         "rarityPoints": ach.RARITY_POINTS,
-        "shop": shop.shop_payload(),
+        "shop": shop_payload,
         "storeSlots": list(shop.SLOTS.keys()),
         "slotNames": shop.SLOTS,
+        "slotIcons": {s: _SHOP_ICON.get(s, "gem") for s in shop.SLOTS},
         "starterItems": sorted(shop.STARTER_ITEMS),
     }
 

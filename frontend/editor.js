@@ -168,7 +168,7 @@
       this.ghostEl.classList.remove("hidden");
 
       this.hintBar.innerHTML =
-        '<span>💡 ' + escapeHtml(ghost.message) + "</span>" +
+        '<span class="h-with-ic">' + window.icon("bulb", 15) + escapeHtml(ghost.message) + "</span>" +
         '<span class="ghost-snippet">' + escapeHtml(ghost.text) + "</span>";
       this.hintBar.classList.remove("hidden");
     }

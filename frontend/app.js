@@ -4,6 +4,17 @@
 (function () {
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+  const ic = (name, size) => window.icon(name, size);
+
+  // Fill any element marked data-icon with its vector icon.
+  function hydrateIcons(root) {
+    $$("[data-icon]", root || document).forEach((el) => {
+      if (el.dataset.iconDone) return;
+      const size = el.dataset.size ? Number(el.dataset.size) : undefined;
+      el.innerHTML = ic(el.dataset.icon, size);
+      el.dataset.iconDone = "1";
+    });
+  }
 
   const state = {
     token: localStorage.getItem("chimcode_token") || "",
@@ -29,13 +40,13 @@
   }
 
   // ---------------------------------------------------------------- toasts
-  function toast(icon, title, sub, kind) {
+  function toast(iconName, title, sub, kind) {
     const wrap = $("#toasts");
     const t = document.createElement("div");
     t.className = "toast " + (kind || "");
     t.innerHTML =
-      '<div class="t-icon">' + icon + "</div><div><strong>" + escapeHtml(title) + "</strong>" +
-      (sub ? "<span>" + escapeHtml(sub) + "</span>" : "") + "</div>";
+      '<div class="t-icon">' + (window.ChimIcons.has(iconName) ? ic(iconName, 22) : "") + "</div><div><strong>" +
+      escapeHtml(title) + "</strong>" + (sub ? "<span>" + escapeHtml(sub) + "</span>" : "") + "</div>";
     wrap.appendChild(t);
     setTimeout(() => { t.classList.add("out"); setTimeout(() => t.remove(), 400); }, 4200);
   }
@@ -53,7 +64,7 @@
     $("#hud-books").textContent = state.me.books != null ? state.me.books : 0;
     $("#hud-xp").textContent = formatNum(state.me.xp);
     $("#hud-streak").textContent = state.me.streak || 0;
-    $("#hud-avatar").textContent = avatarGlyph(state.me.pfp);
+    $("#hud-avatar").innerHTML = avatarGlyph(state.me.pfp);
     const active = state.me.superActive;
     $("#super-badge").classList.toggle("hidden", !active);
     applyTheme(state.me.equipped && state.me.equipped.theme);
@@ -61,10 +72,10 @@
 
   function avatarGlyph(id) {
     const map = {
-      "chim-01": "🤖", "ava-astro": "🚀", "ava-neon": "💠", "ava-flame": "🔥",
-      "ava-void": "🌌", "ava-dragon": "🐉", "ava-crown": "👑", "ava-prism": "🌈",
+      "chim-01": "robot", "ava-astro": "rocket", "ava-neon": "gem", "ava-flame": "flame",
+      "ava-void": "globe", "ava-dragon": "sparkle", "ava-crown": "crown", "ava-prism": "palette",
     };
-    return map[id] || "🤖";
+    return ic(map[id] || "robot", 26);
   }
 
   function applyTheme(themeId) {
@@ -89,7 +100,7 @@
     });
     $("#bot-speak-toggle").addEventListener("click", (e) => {
       mochiVoice.enabled = !mochiVoice.enabled;
-      e.target.textContent = mochiVoice.enabled ? "🔊" : "🔇";
+      e.target.innerHTML = ic(mochiVoice.enabled ? "eye" : "x", 18);
       if (!mochiVoice.enabled) mochiVoice.stop();
     });
     $("#bot-form").addEventListener("submit", async (e) => {
@@ -152,7 +163,7 @@
     // Never leave the spinner up if a view throws or hangs.
     const guard = setTimeout(() => {
       if (view.querySelector(".spinner")) {
-        view.innerHTML = '<div class="empty"><span class="e-icon">⏳</span>Still loading… check your connection and try again.</div>';
+        view.innerHTML = '<div class="empty"><span class="e-icon" data-icon="timer" data-size="46"></span>Still loading… check your connection and try again.</div>';
       }
     }, 8000);
     const routes = {
@@ -163,8 +174,10 @@
       profile: renderProfile,
     };
     Promise.resolve((routes[state.route] || renderLearn)(view))
+      .then(() => hydrateIcons(view))
       .catch((err) => {
-        view.innerHTML = '<div class="empty"><span class="e-icon">😵</span>Something went wrong: ' + escapeHtml(err.message) + "</div>";
+        view.innerHTML = '<div class="empty"><span class="e-icon" data-icon="alert" data-size="46"></span>Something went wrong: ' + escapeHtml(err.message) + "</div>";
+        hydrateIcons(view);
       })
       .finally(() => clearTimeout(guard));
   }
@@ -185,7 +198,7 @@
       '<div><p class="eyebrow">Your curriculum</p><h2>Pick a language. Go all the way to the deep end.</h2>' +
       "<p>Every track runs from your first line of code to real bots, servers and systems.</p></div>";
     const superBtn = el("button", "btn btn-gold");
-    superBtn.textContent = state.me.superActive ? "🌟 Super Day running" : "🌟 Activate Super Day (250 📖)";
+    superBtn.innerHTML = ic("star",16) + (state.me.superActive ? "Super Day running" : "Activate Super Day (250 Books)");
     superBtn.addEventListener("click", activateSuperDay);
     head.appendChild(superBtn);
     view.appendChild(head);
@@ -193,8 +206,8 @@
     if (onboarding && onboarding.completed && onboarding.goal) {
       const rec = el("div", "card glass");
       rec.style.marginBottom = "22px";
-      rec.innerHTML = '<span class="chip">🎯 Your goal</span> <b>' + escapeHtml(onboarding.goal) + "</b> · " +
-        '<span class="chip">⏱ ' + escapeHtml(onboarding.hours) + "</span>";
+      rec.innerHTML = '<span class="chip chip-ic">' + ic("target",14) + 'Your goal</span> <b>' + escapeHtml(onboarding.goal) + "</b> · " +
+        '<span class="chip chip-ic">' + ic("timer",14) + escapeHtml(onboarding.hours) + "</span>";
       view.appendChild(rec);
     }
 
@@ -205,7 +218,7 @@
       const pct = lang.lessonCount ? Math.round((prog.done / lang.lessonCount) * 100) : 0;
       card.style.setProperty("--lang", lang.color);
       card.innerHTML =
-        '<div class="lang-icon">' + lang.icon + "</div>" +
+        '<div class="lang-icon">' + ic(lang.icon, 32) + "</div>" +
         "<h3>" + escapeHtml(lang.name) + "</h3>" +
         '<div class="tagline">' + escapeHtml(lang.tagline) + "</div>" +
         '<div class="progress-bar"><i style="width:' + pct + '%"></i></div>' +
@@ -231,7 +244,7 @@
 
     const head = el("div", "section-head");
     head.style.marginTop = "16px";
-    head.innerHTML = "<div><p class='eyebrow'>" + lang.icon + " " + escapeHtml(lang.name) + "</p><h2>" + escapeHtml(lang.tagline) + "</h2><p>" + escapeHtml(lang.blurb) + "</p></div>";
+    head.innerHTML = "<div><p class='eyebrow'>" + ic(lang.icon, 15) + " " + escapeHtml(lang.name) + "</p><h2>" + escapeHtml(lang.tagline) + "</h2><p>" + escapeHtml(lang.blurb) + "</p></div>";
     view.appendChild(head);
 
     const list = el("div", "grid");
@@ -239,7 +252,7 @@
     lang.lessons.forEach((lesson, i) => {
       const row = el("div", "lesson-row" + (done[lesson.id] === "completed" ? " done" : ""));
       row.innerHTML =
-        '<div class="lr-index">' + (done[lesson.id] === "completed" ? "✓" : i + 1) + "</div>" +
+        '<div class="lr-index">' + (done[lesson.id] === "completed" ? ic("check",16) : i + 1) + "</div>" +
         '<div class="lr-body"><div class="lr-title">' + escapeHtml(lesson.title) + "</div>" +
         '<div class="lr-concept">' + escapeHtml(lesson.concept) + "</div></div>" +
         '<span class="chip level-' + lesson.level + '">' + lesson.level + "</span>" +
@@ -270,7 +283,7 @@
       "<p class='eyebrow'>" + escapeHtml(lesson.concept) + "</p>" +
       "<h2>" + escapeHtml(lesson.title) + "</h2>" +
       '<span class="chip level-' + lesson.level + '">' + lesson.level + "</span> " +
-      '<span class="chip">⏱ ' + lesson.minutes + " min</span>";
+      '<span class="chip chip-ic">' + ic("timer",14) + lesson.minutes + " min</span>";
 
     const theory = el("div");
     lesson.theory.forEach((t, i) => {
@@ -303,10 +316,10 @@
             $$(".quiz-opt", opts).forEach((x) => (x.disabled = true));
             b.classList.add(r.correct ? "correct" : "wrong");
             if (!r.correct) $$(".quiz-opt", opts)[r.answer].classList.add("correct");
-            toast(r.correct ? "✅" : "❌", r.correct ? "Correct!" : "Not quite", r.explanation, r.correct ? "good" : "bad");
+            toast(r.correct ? "check" : "x", r.correct ? "Correct!" : "Not quite", r.explanation, r.correct ? "good" : "bad");
             celebrate(r.newAchievements);
             state.me = await api("/me"); refreshHud();
-          } catch (e) { toast("⚠️", "Quiz error", e.message, "bad"); }
+          } catch (e) { toast("alert", "Quiz error", e.message, "bad"); }
         });
         opts.appendChild(b);
       });
@@ -323,9 +336,9 @@
     const actions = el("div");
     actions.style.cssText = "display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;";
     const runBtn = el("button", "btn btn-primary"); runBtn.textContent = "Run & check";
-    const helpBtn = el("button", "btn"); helpBtn.textContent = "🤖 Ask Mochi";
-    const hintBtn = el("button", "btn btn-ghost"); hintBtn.textContent = "💡 Hint";
-    const watchBtn = el("button", "btn btn-ghost"); watchBtn.textContent = "👀 Watch Mochi";
+    const helpBtn = el("button", "btn"); helpBtn.innerHTML = ic("robot",16) + "Ask Mochi";
+    const hintBtn = el("button", "btn btn-ghost"); hintBtn.innerHTML = ic("bulb",16) + "Hint";
+    const watchBtn = el("button", "btn btn-ghost"); watchBtn.innerHTML = ic("eye",16) + "Watch Mochi";
     actions.append(runBtn, helpBtn, hintBtn, watchBtn);
     right.appendChild(actions);
 
@@ -335,7 +348,7 @@
     if (lesson.challenge) {
       const ch = el("div", "card");
       ch.style.marginTop = "18px";
-      ch.innerHTML = "<b>🧩 Challenge</b><p>" + escapeHtml(lesson.challenge) + "</p>";
+      ch.innerHTML = "<b class=\"h-with-ic\">" + ic("puzzle",16) + "Challenge</b><p>" + escapeHtml(lesson.challenge) + "</p>";
       const chBtn = el("button", "btn btn-gold btn-sm"); chBtn.textContent = "Attempt challenge";
       chBtn.addEventListener("click", () => {
         const code = prompt("Write your challenge solution:\n" + lesson.challenge, lesson.challengeStarter || "");
@@ -349,7 +362,7 @@
     if (lesson.superDay && lesson.superPlan) {
       const sd = el("div", "card");
       sd.style.cssText = "margin-top:18px;border-color:rgba(251,191,36,.5)";
-      sd.innerHTML = "<b>🌟 Super Day mode active</b><p>" + escapeHtml(lesson.superPlan.spoken) + "</p>";
+      sd.innerHTML = "<b class=\"h-with-ic\">" + ic("star",16) + "Super Day mode active</b><p>" + escapeHtml(lesson.superPlan.spoken) + "</p>";
       const sdBtn = el("button", "btn btn-gold btn-sm"); sdBtn.textContent = "Open Super Day menu";
       sdBtn.addEventListener("click", () => openSuperMenu(lesson));
       sd.appendChild(sdBtn);
@@ -378,13 +391,13 @@
       try {
         const reply = await api("/bot/help", { method: "POST", body: { lesson_id: lesson.id, code: state.editor.getValue() } });
         showBotReply(reply, results);
-      } catch (e) { toast("⚠️", "Mochi is busy", e.message, "bad"); }
+      } catch (e) { toast("alert", "Mochi is busy", e.message, "bad"); }
     });
     hintBtn.addEventListener("click", () => {
       const hints = lesson.hints || [];
       const h = hints[Math.min(state.hintCount || 0, hints.length - 1)] || "Re-read the theory steps above.";
       state.hintCount = (state.hintCount || 0) + 1;
-      toast("💡", "Hint " + state.hintCount, h);
+      toast("bulb", "Hint " + state.hintCount, h);
       state.bot && state.bot.setState("thinking");
     });
     watchBtn.addEventListener("click", async () => {
@@ -424,24 +437,24 @@
       state.bot.talk(1800);
       if (r.passed) {
         mochiVoice.speak("That is correct. Nicely done.");
-        toast("✅", "Lesson complete!", "+" + r.rewards.books + " Books · +" + r.rewards.xp + " XP", "good");
+        toast("check", "Lesson complete!", "+" + r.rewards.books + " Books · +" + r.rewards.xp + " XP", "good");
       } else {
-        toast("🧩", "Keep going", r.passed ? "" : "Mochi marked what to fix.", "bad");
+        toast("puzzle", "Keep going", r.passed ? "" : "Mochi marked what to fix.", "bad");
       }
       celebrate(r.rewards.newAchievements);
       state.me = await api("/me");
       refreshHud();
-    } catch (e) { toast("⚠️", "Could not check", e.message, "bad"); }
+    } catch (e) { toast("alert", "Could not check", e.message, "bad"); }
   }
 
   async function submitChallenge(lessonId, code, results) {
     try {
       const r = await api("/challenge", { method: "POST", body: { lesson_id: lessonId, code } });
       renderResults(results, r, true);
-      if (r.passed) toast("🧩", "Challenge beaten!", "+45 Books · +120 XP", "good");
+      if (r.passed) toast("puzzle", "Challenge beaten!", "+45 Books · +120 XP", "good");
       celebrate(r.rewards.newAchievements);
       state.me = await api("/me"); refreshHud();
-    } catch (e) { toast("⚠️", "Challenge error", e.message, "bad"); }
+    } catch (e) { toast("alert", "Challenge error", e.message, "bad"); }
   }
 
   function renderResults(container, r, isChallenge) {
@@ -462,7 +475,7 @@
     const list = el("ul", "check-list");
     r.checks.forEach((c) => {
       const li = el("li", c.ok ? "ok" : "bad");
-      li.innerHTML = '<span class="c-ico">' + (c.ok ? "✅" : "❌") + "</span><span>" + escapeHtml(c.message) + "</span>";
+      li.innerHTML = '<span class="c-ico">' + ic(c.ok ? "check" : "x", 15) + "</span><span>" + escapeHtml(c.message) + "</span>";
       list.appendChild(li);
     });
     container.appendChild(list);
@@ -470,7 +483,7 @@
     if (r.issues && r.issues.length) {
       const issues = el("div", "card");
       issues.style.marginTop = "12px";
-      issues.innerHTML = "<b>🤖 Mochi spotted</b>";
+      issues.innerHTML = "<b class=\"h-with-ic\">" + ic("robot",16) + "Mochi spotted</b>";
       r.issues.slice(0, 6).forEach((i) => {
         const row = el("div");
         row.style.cssText = "margin-top:8px;font-size:13.5px";
@@ -485,7 +498,7 @@
   function showBotReply(reply, container) {
     const box = el("div", "card");
     box.style.cssText = "margin-top:16px;border-color:rgba(124,92,255,.5)";
-    let html = "<b>🤖 Mochi says</b><p>" + escapeHtml(reply.spoken) + "</p>";
+    let html = "<b class=\"h-with-ic\">" + ic("robot",16) + "Mochi says</b><p>" + escapeHtml(reply.spoken) + "</p>";
     if (reply.steps && reply.steps.length) {
       html += "<ul style='padding-left:18px;color:var(--muted);font-size:13.5px'>" +
         reply.steps.map((s) => "<li>" + escapeHtml(s.detail) + "</li>").join("") + "</ul>";
@@ -502,16 +515,16 @@
   async function activateSuperDay() {
     try {
       const r = await api("/superday/buy", { method: "POST" });
-      toast("🌟", "Super Day activated!", "For the next 24 hours Mochi explains hard stuff endlessly.", "good");
+      toast("star", "Super Day activated!", "For the next 24 hours Mochi explains hard stuff endlessly.", "good");
       celebrate(r.newAchievements);
       state.me = await api("/me"); refreshHud();
       if (state.lesson) openLesson(state.lesson.id);
-    } catch (e) { toast("⚠️", "Cannot activate", e.message, "bad"); }
+    } catch (e) { toast("alert", "Cannot activate", e.message, "bad"); }
   }
 
   function openSuperMenu(lesson) {
     const plan = lesson.superPlan;
-    modal("🌟 Super Day — " + lesson.title, (body) => {
+    modal("Super Day — " + lesson.title, (body) => {
       body.appendChild(pEl(plan.spoken));
       const menu = el("div", "super-menu");
       plan.variations.forEach((v) => {
@@ -519,7 +532,7 @@
         card.innerHTML = "<b>" + escapeHtml(v.name) + "</b><span>" + escapeHtml(v.prompt) + "</span>";
         card.addEventListener("click", () => {
           state.editor.setValue(v.starter || lesson.starter);
-          toast("🧩", "New variation", v.prompt);
+          toast("puzzle", "New variation", v.prompt);
           closeModal();
         });
         menu.appendChild(card);
@@ -527,14 +540,14 @@
       body.appendChild(menu);
       const watch = el("button", "btn btn-gold btn-block");
       watch.style.marginTop = "16px";
-      watch.textContent = "▶ Watch Mochi build it and explain";
+      watch.innerHTML = ic("play",16) + "Watch Mochi build it and explain";
       watch.addEventListener("click", () => openWalkthrough(lesson, plan.walkthrough));
       body.appendChild(watch);
     });
   }
 
   function openWalkthrough(lesson, wt) {
-    modal("👀 Mochi walks you through it", (body) => {
+    modal("Mochi walks you through it", (body) => {
       body.appendChild(pEl(wt.spoken || "Watch closely. I will explain every line."));
       const wrap = el("div");
       wt.narration.forEach((n, i) => {
@@ -575,17 +588,17 @@
         '<span class="status-dot ' + (u.online ? "online" : "offline") + '"></span></div>' +
         '<div class="uc-body"><div class="uc-name">' + escapeHtml(u.username) +
         (u.isFollowing ? ' <span class="chip">following</span>' : "") + "</div>" +
-        '<div class="uc-sub">⚡ ' + formatNum(u.xp) + " · 🏆 " + u.achievements + " · 🔥 " + u.streak + "</div></div>";
+        '<div class="uc-sub stats-inline">' + ic("bolt",13) + " " + formatNum(u.xp) + ic("trophy",13) + " " + u.achievements + ic("flame",13) + " " + u.streak + "</div></div>";
       card.addEventListener("click", () => go("profile", u.username));
       left.appendChild(card);
     });
     if (!users.users.length) {
-      left.innerHTML = '<div class="empty"><span class="e-icon">👥</span>No other public profiles yet. Invite a friend!</div>';
+      left.innerHTML = '<div class="empty"><span class="e-icon" data-icon="users" data-size="46"></span>No other public profiles yet. Invite a friend!</div>';
     }
 
     const right = el("div");
     const boardCard = el("div", "card");
-    boardCard.innerHTML = "<b>🏆 Leaderboard</b>";
+    boardCard.innerHTML = "<b class=\"h-with-ic\">" + ic("trophy",16) + "Leaderboard</b>";
     board.leaders.forEach((l) => {
       const row = el("div");
       row.style.cssText = "display:flex;gap:10px;align-items:center;margin-top:10px;font-size:14px";
@@ -597,7 +610,7 @@
 
     const feedCard = el("div", "card");
     feedCard.style.marginTop = "18px";
-    feedCard.innerHTML = "<b>📡 Live activity</b>";
+    feedCard.innerHTML = "<b class=\"h-with-ic\">" + ic("bolt",16) + "Live activity</b>";
     feed.feed.slice(0, 12).forEach((f) => {
       const row = el("div", "feed-item");
       row.innerHTML = "<span>" + avatarGlyph(f.pfp) + "</span><span><b>" + escapeHtml(f.username) + "</b> " +
@@ -632,7 +645,7 @@
     toolbar.appendChild(all);
     data.categories.filter((c) => c.count).forEach((c) => {
       const b = el("button", "ach-cat");
-      b.textContent = c.icon + " " + c.name + " (" + c.count + ")";
+      b.innerHTML = ic(c.icon, 14) + " " + escapeHtml(c.name) + " (" + c.count + ")";
       if (state.currentAchCategory === c.id) b.classList.add("active");
       b.addEventListener("click", () => { state.currentAchCategory = c.id; renderAchievements(view); });
       toolbar.appendChild(b);
@@ -644,7 +657,7 @@
     list.forEach((a) => {
       const card = el("div", "ach-card " + (a.earned ? "earned" : "locked"));
       card.innerHTML =
-        '<span class="a-icon">' + (a.earned ? a.icon : "🔒") + "</span>" +
+        '<span class="a-icon">' + ic(a.earned ? a.icon : "lock", 30) + "</span>" +
         '<div class="a-name">' + escapeHtml(a.name) + "</div>" +
         '<div class="a-desc">' + escapeHtml(a.description) + "</div>" +
         '<div class="rarity-' + a.rarity + '" style="font-size:11px;margin-top:6px;text-transform:uppercase;letter-spacing:.08em">' + a.rarity + "</div>";
@@ -660,15 +673,15 @@
     const head = el("div", "section-head");
     head.innerHTML = "<div><p class='eyebrow'>Books shop</p><h2>Customise your profile</h2><p>Spend Books on avatars, effects, overlays and themes — or save up for a Super Day.</p></div>";
     const wallet = el("div", "pill pill-books");
-    wallet.innerHTML = "<span>📖</span><b>" + data.books + " Books</b>";
+    wallet.innerHTML = ic("book",15) + "<b>" + data.books + " Books</b>";
     head.appendChild(wallet);
     view.appendChild(head);
 
     const superCard = el("div", "card");
     superCard.style.cssText = "margin-bottom:22px;border-color:rgba(251,191,36,.5);background:linear-gradient(120deg,rgba(251,191,36,.12),rgba(124,92,255,.08))";
-    superCard.innerHTML = "<b>🌟 Super Day</b><p>One day where Mochi only teaches the hard stuff and explains it as many times as you need. It never does the work for you — it shows you a similar problem, then narrates a full walkthrough while you type it yourself.</p>";
+    superCard.innerHTML = "<b class=\"h-with-ic\">" + ic("star",16) + "Super Day</b><p>One day where Mochi only teaches the hard stuff and explains it as many times as you need. It never does the work for you — it shows you a similar problem, then narrates a full walkthrough while you type it yourself.</p>";
     const buySuper = el("button", "btn btn-gold");
-    buySuper.textContent = state.me.superActive ? "Active now" : "Activate — " + data.superDayCost + " 📖";
+    buySuper.textContent = state.me.superActive ? "Active now" : "Activate — " + data.superDayCost + " Books";
     buySuper.disabled = state.me.superActive;
     buySuper.addEventListener("click", activateSuperDay);
     superCard.appendChild(buySuper);
@@ -684,13 +697,13 @@
       data.grouped[slot].forEach((item) => {
         const card = el("div", "card shop-item");
         const preview = el("div", "si-preview");
-        preview.textContent = item.icon;
+        preview.innerHTML = ic(item.icon, 40);
         if (item.css && /gradient|#/.test(item.css) && !["sparkle", "matrix", "aurora", "galaxy", "lightning", "grid", "scanline", "holo", "circuit", "midnight", "cyber", "emerald", "crimson", "royal", "none"].includes(item.css)) {
           preview.style.background = item.css;
         }
         card.appendChild(preview);
         card.innerHTML += "<b>" + escapeHtml(item.name) + "</b><p style='font-size:12.5px'>" + escapeHtml(item.description) + "</p>" +
-          '<div class="si-price">' + (item.price === 0 ? "Free" : item.price + " 📖") + "</div>";
+          '<div class="si-price">' + (item.price === 0 ? "Free" : item.price + " Books") + "</div>";
         if (item.owned) card.innerHTML += '<span class="badge-owned ' + (item.equipped ? "badge-equipped" : "") + '">' + (item.equipped ? "Equipped" : "Owned") + "</span>";
         const actions = el("div", "si-actions");
         if (!item.owned) {
@@ -717,19 +730,19 @@
   async function buyItem(id, view) {
     try {
       const r = await api("/shop/buy/" + id, { method: "POST" });
-      toast("🛒", "Purchased!", "Equip it from your profile or here.", "good");
+      toast("cart", "Purchased!", "Equip it from your profile or here.", "good");
       celebrate(r.newAchievements);
       state.me = await api("/me"); refreshHud();
       renderShop(view);
-    } catch (e) { toast("⚠️", "Purchase failed", e.message, "bad"); }
+    } catch (e) { toast("alert", "Purchase failed", e.message, "bad"); }
   }
   async function equipItem(id, view) {
     try { await api("/shop/equip/" + id, { method: "POST" }); state.me = await api("/me"); refreshHud(); renderShop(view); }
-    catch (e) { toast("⚠️", "Cannot equip", e.message, "bad"); }
+    catch (e) { toast("alert", "Cannot equip", e.message, "bad"); }
   }
   async function unequipItem(slot, view) {
     try { await api("/shop/unequip/" + slot, { method: "POST" }); state.me = await api("/me"); refreshHud(); renderShop(view); }
-    catch (e) { toast("⚠️", "Cannot unequip", e.message, "bad"); }
+    catch (e) { toast("alert", "Cannot unequip", e.message, "bad"); }
   }
 
   // ================================================================ PROFILE
@@ -739,7 +752,7 @@
     let profile;
     try { profile = await api("/users/" + encodeURIComponent(username)); }
     catch (e) {
-      view.innerHTML = '<div class="empty"><span class="e-icon">🔒</span>' + escapeHtml(e.message) + "</div>";
+      view.innerHTML = '<div class="empty"><span class="e-icon" data-icon="lock" data-size="46"></span>' + escapeHtml(e.message) + "</div>";
       return;
     }
     view.innerHTML = "";
@@ -767,10 +780,10 @@
       (profile.bio ? escapeHtml(profile.bio) : "No bio yet.") + "</p>";
     const statRow = el("div", "stat-row");
     [
-      ["⚡", formatNum(profile.xp), "XP"],
-      ["🏆", profile.achievements, "Achievements"],
-      ["🔥", profile.streak, "Streak"],
-      ["👥", profile.followers, "Followers"],
+      ["bolt", formatNum(profile.xp), "XP"],
+      ["trophy", profile.achievements, "Achievements"],
+      ["flame", profile.streak, "Streak"],
+      ["users", profile.followers, "Followers"],
     ].forEach(([i, v, l]) => {
       const s = el("div", "stat");
       s.innerHTML = "<b>" + i + " " + v + "</b><span>" + l + "</span>";
@@ -781,9 +794,9 @@
 
     const actions = el("div", "profile-actions");
     if (isSelf) {
-      const edit = el("button", "btn"); edit.textContent = "✏️ Edit profile";
+      const edit = el("button", "btn"); edit.innerHTML = ic("user",16) + "Edit profile";
       edit.addEventListener("click", () => openEditProfile(profile, view));
-      const shop = el("button", "btn btn-ghost"); shop.textContent = "🛍 Shop";
+      const shop = el("button", "btn btn-ghost"); shop.innerHTML = ic("bag",16) + "Shop";
       shop.addEventListener("click", () => go("shop"));
       actions.append(edit, shop);
     } else {
@@ -794,10 +807,10 @@
         renderProfile(view);
       });
       const friend = el("button", "btn " + (profile.isFriend ? "btn-ghost" : ""));
-      friend.textContent = profile.isFriend ? "Friends ✓" : "Add friend";
+      friend.textContent = profile.isFriend ? "Friends" : "Add friend";
       friend.addEventListener("click", async () => {
         await api("/friends/" + profile.username, { method: "POST" });
-        toast("🤝", "Updated", "Friend list changed.");
+        toast("handshake", "Updated", "Friend list changed.");
         renderProfile(view);
       });
       actions.append(follow, friend);
@@ -812,16 +825,16 @@
     const grid = el("div", "grid grid-4");
     (profile.achievementList || []).slice(0, 12).forEach((a) => {
       const card = el("div", "ach-card earned");
-      card.innerHTML = '<span class="a-icon">' + a.icon + '</span><div class="a-name">' + escapeHtml(a.name) + '</div><div class="a-desc">' + escapeHtml(a.description) + "</div>";
+      card.innerHTML = '<span class="a-icon">' + ic(a.icon, 30) + '</span><div class="a-name">' + escapeHtml(a.name) + '</div><div class="a-desc">' + escapeHtml(a.description) + "</div>";
       grid.appendChild(card);
     });
-    if (!(profile.achievementList || []).length) grid.innerHTML = '<div class="empty"><span class="e-icon">🏆</span>No achievements yet.</div>';
+    if (!(profile.achievementList || []).length) grid.innerHTML = '<div class="empty"><span class="e-icon" data-icon="trophy" data-size="46"></span>No achievements yet.</div>';
     earned.appendChild(grid);
     view.appendChild(earned);
   }
 
   function openEditProfile(profile, view) {
-    modal("✏️ Edit profile", (body) => {
+    modal("Edit profile", (body) => {
       const form = el("div");
       form.style.display = "grid";
       form.style.gap = "14px";
@@ -851,9 +864,9 @@
           state.me = await api("/me");
           refreshHud();
           closeModal();
-          toast("✅", "Profile saved", "", "good");
+          toast("check", "Profile saved", "", "good");
           renderProfile(view);
-        } catch (e) { toast("⚠️", "Could not save", e.message, "bad"); }
+        } catch (e) { toast("alert", "Could not save", e.message, "bad"); }
       });
       body.appendChild(save);
     });
@@ -865,7 +878,7 @@
     const box = el("div", "modal glass");
     const head = el("div", "modal-head");
     head.innerHTML = "<h3 style='margin:0'>" + escapeHtml(title) + "</h3>";
-    const close = el("button", "icon-btn"); close.textContent = "✕";
+    const close = el("button", "icon-btn"); close.innerHTML = ic("x",16);
     close.addEventListener("click", closeModal);
     head.appendChild(close);
     box.appendChild(head);
@@ -916,36 +929,36 @@
   // ================================================================ onboarding
   const ONBOARD_STEPS = [
     { key: "goal", q: "What do you want to build?", helper: "Mochi tailors lessons and projects around this.", options: [
-      { v: "Bots & automation", i: "🤖", d: "Discord bots, scrapers, scripts" },
-      { v: "Websites & apps", i: "🌐", d: "Front ends and full-stack apps" },
-      { v: "Games & engines", i: "🎮", d: "C++ and real-time graphics" },
-      { v: "Servers & backends", i: "🖥️", d: "APIs, databases, cloud" },
-      { v: "Data & AI", i: "📊", d: "Analysis, ML and pipelines" },
-      { v: "Just curious", i: "✨", d: "I want to see what coding is" },
+      { v: "Bots & automation", i: "robot", d: "Discord bots, scrapers, scripts" },
+      { v: "Websites & apps", i: "globe", d: "Front ends and full-stack apps" },
+      { v: "Games & engines", i: "gamepad", d: "C++ and real-time graphics" },
+      { v: "Servers & backends", i: "server", d: "APIs, databases, cloud" },
+      { v: "Data & AI", i: "chart", d: "Analysis, ML and pipelines" },
+      { v: "Just curious", i: "sparkle", d: "I want to see what coding is" },
     ]},
     { key: "experience", q: "How much coding have you done?", helper: "No judgement. This sets your starting pace.", options: [
-      { v: "Never written code", i: "🌱", d: "Total beginner" },
-      { v: "A little", i: "🌿", d: "I have tried tutorials" },
-      { v: "Comfortable", i: "🌳", d: "I can build small things" },
-      { v: "Experienced", i: "🏔️", d: "I want the deep end" },
+      { v: "Never written code", i: "heart", d: "Total beginner" },
+      { v: "A little", i: "heart", d: "I have tried tutorials" },
+      { v: "Comfortable", i: "heart", d: "I can build small things" },
+      { v: "Experienced", i: "star", d: "I want the deep end" },
     ]},
     { key: "languages", q: "Which languages excite you most?", helper: "Pick as many as you like. You can add more later.", multi: true, options: [
-      { v: "python", i: "🐍" }, { v: "cpp", i: "⚙️" }, { v: "javascript", i: "🟨" },
-      { v: "typescript", i: "🔷" }, { v: "java", i: "☕" }, { v: "csharp", i: "🎯" },
-      { v: "go", i: "🐹" }, { v: "rust", i: "🦀" }, { v: "sql", i: "🗄️" },
-      { v: "bash", i: "🖥️" }, { v: "htmlcss", i: "🎨" },
+      { v: "python", i: "code" }, { v: "cpp", i: "settings" }, { v: "javascript", i: "bolt" },
+      { v: "typescript", i: "code" }, { v: "java", i: "server" }, { v: "csharp", i: "target" },
+      { v: "go", i: "heartbeat" }, { v: "rust", i: "settings" }, { v: "sql", i: "db" },
+      { v: "bash", i: "server" }, { v: "htmlcss", i: "palette" },
     ]},
     { key: "hours", q: "How long are you willing to invest?", helper: "Mochi will build a realistic plan around it.", options: [
-      { v: "5 minutes a day", i: "☕", d: "Casual and steady" },
-      { v: "15 minutes a day", i: "⏱️", d: "The sweet spot" },
-      { v: "30 minutes a day", i: "🕐", d: "Serious progress" },
-      { v: "1 hour or more", i: "🚀", d: "I want to go fast" },
+      { v: "5 minutes a day", i: "server", d: "Casual and steady" },
+      { v: "15 minutes a day", i: "timer", d: "The sweet spot" },
+      { v: "30 minutes a day", i: "clock", d: "Serious progress" },
+      { v: "1 hour or more", i: "rocket", d: "I want to go fast" },
     ]},
     { key: "motivation", q: "Why are you learning to code?", helper: "This shapes the tone of Mochi's coaching.", options: [
-      { v: "A career", i: "💼", d: "Get hired as a developer" },
-      { v: "A personal project", i: "🛠️", d: "I have something to build" },
-      { v: "School or university", i: "🎓", d: "For my studies" },
-      { v: "Pure fun", i: "🎉", d: "It looks like a good time" },
+      { v: "A career", i: "bag", d: "Get hired as a developer" },
+      { v: "A personal project", i: "settings", d: "I have something to build" },
+      { v: "School or university", i: "cap", d: "For my studies" },
+      { v: "Pure fun", i: "sparkle", d: "It looks like a good time" },
     ]},
   ];
 
@@ -1016,7 +1029,7 @@
 
       label.appendChild(input);
       const body = document.createElement("span");
-      body.innerHTML = '<span class="o-icon">' + opt.i + '</span><span>' +
+      body.innerHTML = '<span class="o-icon">' + ic(opt.i, 22) + '</span><span>' +
         '<span class="o-label">' + escapeHtml(opt.v) + "</span>" +
         (opt.d ? '<span class="o-desc"> · ' + escapeHtml(opt.d) + "</span>" : "") + "</span>";
       label.appendChild(body);
@@ -1042,9 +1055,9 @@
       $("#bot-dock").classList.remove("hidden");
       state.me = await api("/me");
       refreshHud();
-      toast("🎉", "Welcome to ChimCode!", "+50 Books for finishing setup.", "good");
+      toast("sparkle", "Welcome to ChimCode!", "+50 Books for finishing setup.", "good");
       go("learn");
-    } catch (e) { toast("⚠️", "Could not save", e.message, "bad"); }
+    } catch (e) { toast("alert", "Could not save", e.message, "bad"); }
   }
 
   // ================================================================ bootstrap
@@ -1107,6 +1120,7 @@
     // Pick a backend first: local (no server needed) or a reachable server.
     try { await window.ChimAPI.boot(); } catch (e) { /* local always works */ }
 
+    hydrateIcons(document);
     wireAuth();
     $$(".nav-link").forEach((b) => b.addEventListener("click", () => go(b.dataset.route)));
     $("#hud-avatar").addEventListener("click", () => go("profile"));
@@ -1154,14 +1168,14 @@
     const fineprint = $("#gate-fineprint");
     if (window.ChimAPI.mode === "local") {
       if (badge) {
-        badge.textContent = "✓ Ready offline — no server needed";
+        badge.innerHTML = ic("check",14) + "Ready offline — no server needed";
         badge.classList.add("mode-local");
         badge.classList.remove("hidden");
       }
       if (fineprint) fineprint.textContent = "Everything saves on this device. No server, no sign-up fees, no internet required.";
     } else {
       if (badge) {
-        badge.textContent = "● Connected to server";
+        badge.innerHTML = ic("globe",14) + "Connected to server";
         badge.classList.add("mode-server");
         badge.classList.remove("hidden");
       }

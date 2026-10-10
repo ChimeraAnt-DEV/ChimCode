@@ -31,6 +31,8 @@ who want a tutor that actually watches their code.
 - 🔌 **No server required.** ChimCode runs entirely in your browser. The whole
   app, all 57 lessons and the achievement engine work offline; your account and
   progress save on your device. There is nothing to sign up for or pay for.
+- 🎨 **A real vector icon set.** Every icon is hand-drawn SVG that inherits its
+  colour and scales crisply — no emoji standing in for design.
 - 🤖 **Mochi, a 2D animated robot tutor.** A real canvas-rendered robot with a
   head, torso, robotic arms and legs. It hovers *directly above your mistake*
   with a speech bubble telling you what is wrong and what it should be instead.
@@ -64,7 +66,7 @@ A native Android app is included in [`android/`](android). Everything is
 bundled inside it, so it works immediately — **no server, no internet, nothing
 to set up**.
 
-**Download the APK** — [**chimcode-1.1.0-android.apk**](https://github.com/ChimeraAnt-DEV/ChimCode/releases/latest)
+**Download the APK** — [**chimcode-1.2.0-android.apk**](https://github.com/ChimeraAnt-DEV/ChimCode/releases/latest)
 (signed, Android 7.0+). Open it, allow *Install unknown apps*, install.
 
 **Build it yourself:**
@@ -249,6 +251,7 @@ ChimCode/
 │   ├── api.js                 # Picks local or server backend automatically
 │   ├── local.js               # The entire API in the browser (localStorage)
 │   ├── engine.js              # Grading, mistake detection, ghost text, walkthroughs
+│   ├── icons.js               # Hand-drawn SVG icon set (no emoji)
 │   ├── bot.js                 # Mochi: canvas robot + speech-synthesis voice
 │   ├── editor.js              # Editor, mistake markers, ghost text, bot overlay
 │   ├── data/chimdata.js       # Generated curriculum, achievements and shop

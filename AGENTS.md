@@ -25,10 +25,25 @@ Env knobs (server only): `CHIMCODE_SECRET_KEY`, `CHIMCODE_DATA_DIR`,
 
 ## Key facts
 - **No build step** for the frontend. Edit `frontend/*.js` / `styles.css` directly.
+- **All asset paths in `index.html` must be relative** (e.g. `engine.js`, not
+  `/engine.js`). The Android app loads the page from `file:///android_asset/www/`,
+  where absolute paths resolve to `file:///engine.js` and silently fail, leaving
+  a dead page. This has broken the app before — always check with
+  `tools/check_assets.py`.
+- **Never use emoji as UI icons or currency.** Use the SVG set in
+  `frontend/icons.js` via `window.icon(name, size)`; data emits icon *names*.
+  `tools/export_static_data.py` maps categories/slots/languages to icon names.
 - **Single source of truth:** curriculum, achievements and shop live in
   `server/app/`. Run `python3 tools/export_static_data.py` after changing them;
   it regenerates `frontend/data/chimdata.js`, which the offline engine reads.
   Never hand-edit `chimdata.js`.
+- **App icons are vector.** `frontend/assets/icon/icon.svg` (+ `-foreground.svg`,
+  `-background.svg`) are rasterized by `make_icons.py` and
+  `android/tools/make_android_icons.py` using `rsvg-convert`
+  (`apt-get install librsvg2-bin`). Do not go back to drawing icons pixel by pixel.
+- `frontend/glass` styling must keep an opaque fallback: some Android WebViews
+  do not support `backdrop-filter`, and without the fallback the panels look flat
+  and papery.
 - **Two engines that must stay in sync:** `server/app/engine.py` and
   `frontend/engine.js`. `tools/test_local_backend.js` covers the JS one; when you
   change grading or mistake detection, change both.

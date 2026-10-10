@@ -6,13 +6,13 @@
   <title>ChimCode — Learn every language, build anything</title>
   <meta name="description" content="ChimCode teaches you to code in Python, C++, JavaScript and more — all the way to bots, servers and real projects. A premium, animated coding tutor with 700+ achievements." />
   <meta name="theme-color" content="#0a0a14" />
-  <link rel="icon" href="/assets/icon/favicon.svg" type="image/svg+xml" />
-  <link rel="apple-touch-icon" href="/assets/icon/icon-192.png" />
-  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="assets/icon/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="assets/icon/icon-192.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div id="bg-fx" class="bg-fx" aria-hidden="true">
@@ -29,7 +29,7 @@
   <main id="gate" class="gate">
     <section class="gate-hero">
       <div class="brand-mark">
-        <span class="brand-glyph">◈</span>
+        <span class="brand-glyph" aria-hidden="true"></span>
         <span class="brand-name">Chim<em>Code</em></span>
       </div>
       <h1 class="hero-title">Learn to code.<br /><span class="grad">Then build <em>anything</em>.</span></h1>
@@ -39,10 +39,10 @@
         then helps you write it yourself.
       </p>
       <ul class="hero-points">
-        <li><span>🤖</span> A 2D robot that hovers over your mistakes and explains out loud</li>
-        <li><span>✨</span> Transparent ghost text that shows what to type next</li>
-        <li><span>🏆</span> 707 achievements, profiles, followers and online status</li>
-        <li><span>📖</span> Earn Books, spend them on cosmetics, effects and Super Days</li>
+        <li><span data-icon="robot"></span> A 2D robot that hovers over your mistakes and explains out loud</li>
+        <li><span data-icon="sparkle"></span> Transparent ghost text that shows what to type next</li>
+        <li><span data-icon="trophy"></span> 707 achievements, profiles, followers and online status</li>
+        <li><span data-icon="book"></span> Earn Books, spend them on cosmetics, effects and Super Days</li>
       </ul>
       <div class="hero-stats">
         <div><strong id="stat-ach">707</strong><span>achievements</span></div>
@@ -88,7 +88,7 @@
   <!-- Onboarding -->
   <main id="onboarding" class="onboarding hidden">
     <div class="onboard-head">
-      <div class="brand-mark small"><span class="brand-glyph">◈</span><span class="brand-name">Chim<em>Code</em></span></div>
+      <div class="brand-mark small"><span class="brand-glyph" aria-hidden="true"></span><span class="brand-name">Chim<em>Code</em></span></div>
       <div class="progress-track"><div id="onboard-progress" class="progress-fill"></div></div>
     </div>
     <div class="onboard-body">
@@ -109,8 +109,8 @@
   <!-- App shell -->
   <div id="app" class="app hidden">
     <header class="topbar glass">
-      <button id="nav-toggle" class="icon-btn nav-toggle" aria-label="Menu">☰</button>
-      <div class="brand-mark small"><span class="brand-glyph">◈</span><span class="brand-name">Chim<em>Code</em></span></div>
+      <button id="nav-toggle" class="icon-btn nav-toggle" aria-label="Menu" data-icon="layers" data-size="18"></button>
+      <div class="brand-mark small"><span class="brand-glyph" aria-hidden="true"></span><span class="brand-name">Chim<em>Code</em></span></div>
       <nav id="topnav" class="topnav">
         <button class="nav-link" data-route="learn">Learn</button>
         <button class="nav-link" data-route="community">Community</button>
@@ -119,11 +119,11 @@
         <button class="nav-link" data-route="profile">Profile</button>
       </nav>
       <div class="topbar-right">
-        <div class="pill pill-books" title="Books — spend on cosmetics and Super Days"><span>📖</span><b id="hud-books">0</b></div>
-        <div class="pill pill-xp" title="Experience"><span>⚡</span><b id="hud-xp">0</b></div>
-        <div class="pill pill-streak" title="Daily streak"><span>🔥</span><b id="hud-streak">0</b></div>
-        <button id="super-badge" class="super-badge hidden" title="Super Day active">🌟 Super Day</button>
-        <button id="hud-avatar" class="hud-avatar" data-route="profile" aria-label="Your profile">🤖</button>
+        <div class="pill pill-books" title="Books — spend on cosmetics and Super Days"><span class="pill-ic" data-icon="book"></span><b id="hud-books">0</b></div>
+        <div class="pill pill-xp" title="Experience"><span class="pill-ic" data-icon="bolt"></span><b id="hud-xp">0</b></div>
+        <div class="pill pill-streak" title="Daily streak"><span class="pill-ic" data-icon="flame"></span><b id="hud-streak">0</b></div>
+        <button id="super-badge" class="super-badge hidden" title="Super Day active"><span class="pill-ic" data-icon="star"></span>Super Day</button>
+        <button id="hud-avatar" class="hud-avatar" data-route="profile" aria-label="Your profile"></button>
       </div>
     </header>
 
@@ -132,7 +132,7 @@
 
   <!-- Bot companion dock -->
   <div id="bot-dock" class="bot-dock hidden">
-    <button id="bot-toggle" class="bot-toggle" aria-label="Talk to Mochi">🤖</button>
+    <button id="bot-toggle" class="bot-toggle" aria-label="Talk to Mochi"><span data-icon="robot" data-size="30"></span></button>
     <div id="bot-panel" class="bot-panel glass hidden">
       <div class="bot-panel-head">
         <div id="bot-stage-dock" class="bot-stage bot-stage--sm"></div>
@@ -140,7 +140,7 @@
           <strong>Mochi</strong>
           <p id="bot-status" class="bot-status">Your coding companion</p>
         </div>
-        <button id="bot-speak-toggle" class="icon-btn" title="Toggle voice">🔊</button>
+        <button id="bot-speak-toggle" class="icon-btn" title="Toggle voice" data-icon="eye" data-size="18"></button>
       </div>
       <div id="bot-messages" class="bot-messages"></div>
       <form id="bot-form" class="bot-form">
@@ -150,12 +150,13 @@
     </div>
   </div>
 
-  <script src="/data/chimdata.js"></script>
-  <script src="/engine.js"></script>
-  <script src="/local.js"></script>
-  <script src="/api.js"></script>
-  <script src="/bot.js"></script>
-  <script src="/editor.js"></script>
-  <script src="/app.js"></script>
+  <script src="data/chimdata.js"></script>
+  <script src="icons.js"></script>
+  <script src="engine.js"></script>
+  <script src="local.js"></script>
+  <script src="api.js"></script>
+  <script src="bot.js"></script>
+  <script src="editor.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>

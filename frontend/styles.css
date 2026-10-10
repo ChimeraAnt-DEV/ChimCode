@@ -72,14 +72,42 @@ button { font-family: inherit; }
   66% { transform: translate(-30px, 25px) scale(.95); }
 }
 
+/* ---------------------------------------------------------- icons */
+.ic { display: inline-block; vertical-align: -0.14em; flex: none; }
+.pill-ic { display: inline-flex; align-items: center; }
+.pill-ic .ic { width: 15px; height: 15px; }
+.h-with-ic { display: inline-flex; align-items: center; gap: 7px; }
+.h-with-ic .ic { color: var(--accent-2); }
+.chip-ic { display: inline-flex; align-items: center; gap: 6px; }
+.chip-ic .ic { color: var(--accent-2); }
+.stats-inline .ic { vertical-align: -0.18em; margin: 0 2px 0 6px; opacity: .85; }
+.stats-inline .ic:first-child { margin-left: 0; }
+.o-icon { display: inline-flex; align-items: center; color: var(--accent-2); }
+.a-icon { color: var(--gold); }
+.ach-card.locked .a-icon { color: var(--muted); }
+.e-icon { display: inline-flex; justify-content: center; margin-bottom: 14px; color: var(--accent-2); }
+.t-icon { display: flex; align-items: center; color: var(--accent-2); }
+.lang-icon { display: inline-flex; color: var(--accent-2); }
+.si-preview { display: grid; place-items: center; color: var(--text); }
+.brand-glyph { display: inline-flex; }
+.brand-glyph .ic { width: 26px; height: 26px; }
+.super-badge { display: inline-flex; align-items: center; gap: 6px; }
+.super-badge .ic { color: #1a1206; }
+#bot-toggle .ic { width: 30px; height: 30px; }
+
 /* ---------------------------------------------------------- glass + buttons */
+/* Solid premium fallback so the panel never looks flat or "papery" where
+   backdrop-filter is unsupported (some Android WebViews). */
 .glass {
-  background: var(--panel);
+  background: linear-gradient(160deg, rgba(30,32,60,.92), rgba(16,17,34,.94));
   border: 1px solid var(--stroke);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.06);
   backdrop-filter: blur(18px) saturate(140%);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .glass { background: var(--panel); }
 }
 .btn {
   border: 1px solid var(--stroke-strong);
@@ -432,8 +460,10 @@ textarea.code-area:focus { box-shadow: none; }
 .fx-galaxy::before { content: ""; position: absolute; inset: -40%;
   background: conic-gradient(from 0deg, rgba(124,92,255,.4), transparent, rgba(34,211,238,.35), transparent, rgba(244,114,182,.4));
   animation: spin-slow 18s linear infinite; opacity: .6; }
-.fx-lightning::before { content: "⚡"; position: absolute; font-size: 40px; top: 10%; left: 12%; animation: zap 1.4s steps(2) infinite; }
-@keyframes zap { 50% { opacity: 0; transform: translateX(60px) rotate(20deg); } }
+.fx-lightning::before { content: ""; position: absolute; top: 8%; left: 8%; width: 44px; height: 44px;
+  background: var(--gold); clip-path: polygon(58% 0, 22% 52%, 46% 52%, 34% 100%, 80% 40%, 52% 40%);
+  filter: drop-shadow(0 0 12px rgba(251,191,36,.8)); animation: zap 1.6s steps(2) infinite; }
+@keyframes zap { 50% { opacity: .15; transform: translateX(58px) rotate(14deg); } }
 .ov-grid::before { content: ""; position: absolute; inset: 0;
   background-image: linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px);
   background-size: 22px 22px; }

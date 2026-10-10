@@ -1,50 +1,57 @@
 #!/usr/bin/env python3
-"""Generate Android launcher icons from the shared ChimCode icon renderer.
+"""Generate Android launcher icons from the shared vector icon art.
 
-Writes legacy mipmap PNGs (square + round) plus an adaptive-icon foreground
-layer for every density bucket. Standard library only.
+Writes legacy mipmap PNGs (square + round) plus adaptive-icon foreground and
+background layers for every density bucket, rendering the same SVG used by the
+web icon so web and Android stay identical.
 """
 from __future__ import annotations
 
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parent.parent / "frontend" / "assets" / "icon"))
-import make_icons  # noqa: E402
-
+ICON_DIR = HERE.parent.parent / "frontend" / "assets" / "icon"
 RES = HERE.parent / "app" / "src" / "main" / "res"
 
-DENSITIES = {
-    "mdpi": 48,
-    "hdpi": 72,
-    "xhdpi": 96,
-    "xxhdpi": 144,
-    "xxxhdpi": 192,
-}
-
-# Adaptive icon foreground is 108dp; the safe zone is the centre 72dp.
-FOREGROUND = {
-    "mdpi": 108,
-    "hdpi": 162,
-    "xhdpi": 216,
-    "xxhdpi": 324,
-    "xxxhdpi": 432,
-}
+# Legacy launcher icon sizes (48dp baseline).
+LEGACY = {"mdpi": 48, "hdpi": 72, "xhdpi": 96, "xxhdpi": 144, "xxxhdpi": 192}
+# Adaptive icon layers are 108dp.
+ADAPTIVE = {"mdpi": 108, "hdpi": 162, "xhdpi": 216, "xxhdpi": 324, "xxxhdpi": 432}
 
 
-def write(path: Path, size: int) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(make_icons.render(size))
-    print("wrote", path.relative_to(RES), size)
+def renderer() -> str:
+    exe = shutil.which("rsvg-convert")
+    if not exe:
+        sys.exit("rsvg-convert is required (apt-get install librsvg2-bin)")
+    return exe
+
+
+def rasterize(svg: Path, size: int, out: Path) -> None:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        [renderer(), "-w", str(size), "-h", str(size), str(svg), "-o", str(out)],
+        check=True,
+    )
+    print("wrote", out.relative_to(RES), size)
 
 
 def main() -> None:
-    for bucket, size in DENSITIES.items():
-        write(RES / f"mipmap-{bucket}" / "ic_launcher.png", size)
-        write(RES / f"mipmap-{bucket}" / "ic_launcher_round.png", size)
-    for bucket, size in FOREGROUND.items():
-        write(RES / f"mipmap-{bucket}" / "ic_launcher_foreground.png", size)
+    icon = ICON_DIR / "icon.svg"
+    fg = ICON_DIR / "icon-foreground.svg"
+    bg = ICON_DIR / "icon-background.svg"
+    for path in (icon, fg, bg):
+        if not path.exists():
+            sys.exit(f"missing {path}")
+
+    for bucket, size in LEGACY.items():
+        rasterize(icon, size, RES / f"mipmap-{bucket}" / "ic_launcher.png")
+        rasterize(icon, size, RES / f"mipmap-{bucket}" / "ic_launcher_round.png")
+    for bucket, size in ADAPTIVE.items():
+        rasterize(fg, size, RES / f"mipmap-{bucket}" / "ic_launcher_foreground.png")
+        rasterize(bg, size, RES / f"mipmap-{bucket}" / "ic_launcher_background.png")
 
 
 if __name__ == "__main__":
