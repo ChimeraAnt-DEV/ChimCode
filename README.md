@@ -10,9 +10,9 @@ A premium, animated coding tutor that takes you from your very first `print()`
 all the way to **Python bots, C++ engines and live servers** — with a 2D robot
 named **Mochi** who hovers over your mistakes and explains exactly what to fix.
 
-[![Languages](https://img.shields.io/badge/languages-11-7c5cff?style=for-the-badge)](.)
-[![Lessons](https://img.shields.io/badge/lessons-57-22d3ee?style=for-the-badge)](.)
-[![Achievements](https://img.shields.io/badge/achievements-707-fbbf24?style=for-the-badge)](.)
+[![Languages](https://img.shields.io/badge/languages-16-7c5cff?style=for-the-badge)](.)
+[![Lessons](https://img.shields.io/badge/lessons-75-22d3ee?style=for-the-badge)](.)
+[![Achievements](https://img.shields.io/badge/achievements-955-fbbf24?style=for-the-badge)](.)
 [![License](https://img.shields.io/badge/license-MIT-f472b6?style=for-the-badge)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776ab?style=for-the-badge&logo=python&logoColor=white)](.)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](.)
@@ -29,7 +29,7 @@ Most coding apps stop at `hello world`. ChimCode is built for people who want to
 who want a tutor that actually watches their code.
 
 - 🔌 **No server required.** ChimCode runs entirely in your browser. The whole
-  app, all 57 lessons and the achievement engine work offline; your account and
+  app, all 75 lessons and the achievement engine work offline; your account and
   progress save on your device. There is nothing to sign up for or pay for.
 - 🎨 **A real vector icon set.** Every icon is hand-drawn SVG that inherits its
   colour and scales crisply — no emoji standing in for design.
@@ -45,7 +45,7 @@ who want a tutor that actually watches their code.
   Mochi explains as many times as you need, opens a menu of "same idea, new
   shape" practice problems, and narrates a full line-by-line walkthrough while
   you retype it yourself.
-- 🏆 **707 achievements** across milestones, every language, lesson mastery,
+- 🏆 **955 achievements** across milestones, every language, lesson mastery,
   social play, your collection and Super Days.
 - 👥 **A real social layer.** Custom accounts, profile pictures, bios,
   usernames, followers, friends, online/offline status and live progress.
@@ -141,6 +141,11 @@ It uses only the Python standard library, so no image tools are required.
 | 🗄️ **SQL** | `SELECT`, filtering, joins and aggregation |
 | 🖥️ **Bash** | Scripts, loops, automation and pipes |
 | 🎨 **HTML & CSS** | Structure, styling, animations, responsive layout |
+| 🟪 **Kotlin** | Android development, null safety |
+| 🕊️ **Swift** | Apple platforms, optionals and guard |
+| 📈 **R** | Vectors, data frames, statistics |
+| 🐘 **PHP** | Server-side web scripting |
+| 🌙 **Lua** | Embeddable scripting, tables |
 
 Every lesson includes **theory**, a worked **example**, a hands-on **task**,
 live **mistake detection**, a **multiple-choice check**, and most have a bonus
@@ -173,7 +178,7 @@ answer for you.
 <tr><td width="50%" valign="top">
 
 **Learning**
-- 11 languages, 57 guided lessons
+- 16 languages, 75 guided lessons
 - Beginner → expert difficulty tiers
 - Live static mistake analysis
 - Bot overlay above the error
@@ -197,7 +202,7 @@ answer for you.
 <tr><td valign="top">
 
 **Progression**
-- 707 achievements, 17 categories
+- 955 achievements, 17 categories
 - XP, streaks and levels
 - Books currency
 - Rarity tiers: common → legendary
@@ -230,7 +235,7 @@ answer for you.
 | Android | **Kotlin + AndroidX WebView** | Native shell with a Text-To-Speech bridge |
 | Icons | **stdlib PNG writer** | Reproducible assets, no tooling required |
 
-The curriculum, the 707-achievement engine and the shop live once in Python
+The curriculum, the 955-achievement engine and the shop live once in Python
 (`server/app/`) and are exported to `frontend/data/chimdata.js` by
 `tools/export_static_data.py`. The JavaScript engine and local backend read that
 same data, so the offline app and the server can never drift apart.
@@ -263,7 +268,7 @@ ChimCode/
 │   │   ├── database.py        # SQLite schema and helpers
 │   │   ├── security.py        # PBKDF2 hashing + JWT
 │   │   ├── engine.py          # Python twin of frontend/engine.js
-│   │   ├── achievements.py    # The 707-achievement source of truth
+│   │   ├── achievements.py    # The 955-achievement source of truth
 │   │   ├── shop.py            # Cosmetics catalogue (source of truth)
 │   │   └── curriculum/        # Lesson content (source of truth)
 │   └── requirements.txt
@@ -355,7 +360,7 @@ It will be recreated on the next boot.
 - [ ] Real code execution in a sandboxed runner
 - [ ] Community-published lessons
 - [ ] Mobile app wrapper (PWA install already works)
-- [ ] More languages: PHP, Kotlin, Swift, Lua
+- [ ] More languages: Haskell, Scala, Elixir, Dart
 
 ---
 

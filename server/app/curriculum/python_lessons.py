@@ -395,7 +395,7 @@ LESSONS: list[Lesson] = [
             contains("on_message", "Handle the on_message event."),
             contains("!ping", "Check for the !ping command."),
             contains("send(", "Send a reply with channel.send."),
-            not_contains("author.bot", "Ignore bot messages before replying."),
+            contains("await", "Await the reply so it is actually sent."),
         ],
         hints=["if message.content == '!ping':", "await message.channel.send('pong')"],
         quiz=Quiz(

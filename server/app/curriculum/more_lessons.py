@@ -532,7 +532,7 @@ _l(
     task="Write a script that counts .py files under the directory given as $1.",
     starter="#!/usr/bin/env bash\n",
     checks=[
-        contains("$1", "Read the first argument."),
+        regex(r"\$\{?1", "Read the first argument with $1 (or ${1:-default})."),
         contains("|", "Pipe output into another command."),
         contains("find", "Use find to locate files."),
     ],

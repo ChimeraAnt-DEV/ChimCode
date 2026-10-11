@@ -96,37 +96,45 @@ def _build() -> list[Achievement]:
     items: list[Achievement] = []
 
     # ---------------------------------------------------------- Milestones
+    # Thresholds are deliberately demanding: early tiers are reachable, but the
+    # meaningful badges require sustained, real practice.
     xp_tiers = []
-    for i in range(1, 71):
-        target = i * 250
+    for target in [500, 1500, 3000, 6000, 10000, 16000, 24000, 34000, 46000, 60000,
+                   80000, 105000, 135000, 170000, 210000, 260000, 320000, 400000,
+                   500000, 650000]:
         xp_tiers.append((target, f"{target:,} XP"))
     items += _tiered("xp", "milestone", "⚡", "xp", xp_tiers)
 
-    streak_tiers = [(i, f"{i} day streak") for i in range(1, 36)]
+    streak_tiers = [(d, f"{d} day streak") for d in
+                    [3, 7, 14, 21, 30, 45, 60, 90, 120, 180, 250, 365, 500]]
     items += _tiered("streak", "milestone", "🔥", "streak", streak_tiers)
 
-    lesson_tiers = [(i, f"{i} lessons done") for i in range(1, 46)]
+    lesson_tiers = [(n, f"{n} lessons done") for n in
+                    [5, 10, 20, 30, 40, 50, 60, 75, 90, 110, 130, 150, 175, 200]]
     items += _tiered("lessons", "milestone", "📚", "lessons_completed", lesson_tiers)
 
-    perfect_tiers = [(i, f"{i} perfect lessons") for i in range(1, 26)]
+    perfect_tiers = [(n, f"{n} perfect lessons") for n in
+                     [5, 10, 18, 28, 40, 55, 70, 90, 110, 135]]
     items += _tiered("perfect", "milestone", "💯", "perfect_scores", perfect_tiers)
 
-    quiz_tiers = [(i * 5, f"{i * 5} quiz answers") for i in range(1, 36)]
+    quiz_tiers = [(n, f"{n} quiz answers") for n in
+                  [10, 25, 50, 100, 175, 275, 400, 550, 750, 1000]]
     items += _tiered("quiz", "milestone", "🧠", "quiz_correct", quiz_tiers)
 
-    minute_tiers = [(i * 30, f"{i * 30} minutes") for i in range(1, 31)]
+    minute_tiers = [(n, f"{n} minutes in lessons") for n in
+                    [60, 180, 360, 600, 900, 1200, 1800, 2400, 3000, 4000, 5000, 6000]]
     items += _tiered("minutes", "milestone", "⏱️", "minutes", minute_tiers)
 
-    challenge_tiers = [(i, f"{i} challenges") for i in range(1, 31)]
+    challenge_tiers = [(n, f"{n} challenges solved") for n in
+                       [3, 8, 15, 25, 40, 55, 70, 85, 100]]
     items += _tiered("challenge", "milestone", "🧩", "challenges_completed", challenge_tiers)
 
     # ---------------------------------------------------------- Super days
-    super_tiers = [(i, f"{i} Super Day{'s' if i > 1 else ''}") for i in range(1, 16)]
+    super_tiers = [(n, f"{n} Super Day{'s' if n > 1 else ''}") for n in [1, 3, 7, 14, 30]]
     items += _tiered("superday", "superday", "🌟", "super_days", super_tiers)
     items += [
-        Achievement("super-first", "First Super Day", "Activate your first Super Day.", "superday", "🌟", "rare", "super_days", 1),
-        Achievement("super-legend", "Super Legend", "Reach 25 Super Days.", "superday", "💫", "legendary", "super_days", 25),
-        Achievement("super-marathon", "Marathon Mind", "Spend 500 minutes inside Super Days.", "superday", "🧘", "epic", "super_minutes", 500),
+        Achievement("super-legend", "Super Legend", "Reach 30 Super Days.", "superday", "💫", "legendary", "super_days", 30),
+        Achievement("super-marathon", "Marathon Mind", "Spend 2000 minutes inside Super Days.", "superday", "🧘", "legendary", "super_minutes", 2000),
     ]
 
     # ---------------------------------------------------------- Per language
@@ -148,11 +156,43 @@ def _build() -> list[Achievement]:
                 f"{lang_id}-all", f"{language.name} Master", f"Complete every {language.name} lesson.",
                 cat, icon, "legendary", "lessons_in", len(language.lessons), scope=lang_id,
             ))
+            # Hard per-language goals: ace everything, clear every challenge,
+            # and do it all without leaning on hints.
+            total = len(language.lessons)
+            items.append(Achievement(
+                f"{lang_id}-aces", f"{language.name} Aced", f"Score 100% on every {language.name} lesson.",
+                cat, icon, "legendary", "aces_in", total, scope=lang_id,
+            ))
+            items.append(Achievement(
+                f"{lang_id}-challenges", f"{language.name} Challenger",
+                f"Solve every challenge in the {language.name} track.",
+                cat, icon, "legendary", "challenges_in", total, scope=lang_id,
+            ))
+            items.append(Achievement(
+                f"{lang_id}-flawless", f"{language.name} Flawless",
+                f"Master every {language.name} lesson and its challenge.",
+                cat, icon, "legendary", "mastered_in", total, scope=lang_id,
+            ))
+            items.append(Achievement(
+                f"{lang_id}-nohelp", f"{language.name} Self-Taught",
+                f"Complete every {language.name} lesson without hints.",
+                cat, icon, "legendary", "nohint_in", total, scope=lang_id,
+            ))
             for level in sorted({lesson.level for lesson in language.lessons}):
                 count = sum(1 for lesson in language.lessons if lesson.level == level)
                 items.append(Achievement(
                     f"{lang_id}-{level}", f"{language.name} {level.title()}", f"Complete every {level} {language.name} lesson.",
                     cat, icon, "epic", "lessons_in_level", count, scope=f"{lang_id}:{level}",
+                ))
+                items.append(Achievement(
+                    f"{lang_id}-{level}-aced", f"{language.name} {level.title()} Aced",
+                    f"Ace every {level} {language.name} lesson.",
+                    cat, icon, "legendary", "aces_in_level", count, scope=f"{lang_id}:{level}",
+                ))
+                items.append(Achievement(
+                    f"{lang_id}-{level}-chal", f"{language.name} {level.title()} Challenger",
+                    f"Solve every {level} {language.name} challenge.",
+                    cat, icon, "legendary", "challenges_in_level", count, scope=f"{lang_id}:{level}",
                 ))
 
     # ---------------------------------------------------------- Per lesson
@@ -170,11 +210,31 @@ def _build() -> list[Achievement]:
                 f"chal-{lesson.id}", f"{lesson.title} Challenge", f"Solve the challenge for '{lesson.title}'.",
                 "mastery", "🧩", "epic", "challenged_lesson", 1, scope=lesson.id,
             ))
+            items.append(Achievement(
+                f"clean-{lesson.id}", f"{lesson.title} Clean Run",
+                f"Finish '{lesson.title}' using no hints.",
+                "mastery", "🧗", "rare", "no_hint_lesson", 1, scope=lesson.id,
+            ))
+            items.append(Achievement(
+                f"flawless-{lesson.id}", f"{lesson.title} Flawless",
+                f"Ace '{lesson.title}' and its challenge.",
+                "mastery", "💎", "epic", "mastered_lesson", 1, scope=lesson.id,
+            ))
+            items.append(Achievement(
+                f"speedrun-{lesson.id}", f"{lesson.title} Speedrun",
+                f"Finish '{lesson.title}' on your first attempt.",
+                "mastery", "⚡", "rare", "first_try_lesson", 1, scope=lesson.id,
+            ))
+            items.append(Achievement(
+                f"perfect-{lesson.id}", f"{lesson.title} Perfectionist",
+                f"Score 100% on '{lesson.title}' without using a hint.",
+                "mastery", "🌟", "epic", "perfect_nohint_lesson", 1, scope=lesson.id,
+            ))
 
     # ---------------------------------------------------------- Social
-    friend_tiers = [(i, f"{i} friend{'s' if i > 1 else ''}") for i in range(1, 13)]
+    friend_tiers = [(i, f"{i} friend{'s' if i > 1 else ''}") for i in [3, 6, 10, 15, 25, 40]]
     items += _tiered("friends", "social", "🤝", "friends", friend_tiers)
-    follower_tiers = [(i * 2, f"{i * 2} followers") for i in range(1, 13)]
+    follower_tiers = [(i, f"{i} followers") for i in [5, 15, 30, 60, 100, 200, 400, 750]]
     items += _tiered("followers", "social", "📣", "followers", follower_tiers)
     items += [
         Achievement("profile-pioneer", "Profile Pioneer", "Complete your profile.", "social", "🪪", "common", "profile_edits", 1),
@@ -186,26 +246,41 @@ def _build() -> list[Achievement]:
     ]
 
     # ---------------------------------------------------------- Collection
-    item_tiers = [(i, f"{i} cosmetics") for i in range(1, 26)]
+    item_tiers = [(i, f"{i} cosmetics owned") for i in [2, 4, 6, 8, 10, 12, 15, 18, 21, 24]]
     items += _tiered("cosmetics", "collection", "💎", "cosmetics_owned", item_tiers)
-    spend_tiers = [(i * 100, f"Spend {i * 100} Books") for i in range(1, 21)]
+    spend_tiers = [(n, f"Spend {n} Books") for n in [250, 750, 1500, 3000, 5000]]
     items += _tiered("spend", "collection", "🛒", "books_spent", spend_tiers)
-    earn_tiers = [(i * 100, f"Earn {i * 100} Books") for i in range(1, 21)]
+    earn_tiers = [(n, f"Earn {n} Books") for n in [500, 1500, 3500, 7000, 12000]]
     items += _tiered("earn", "collection", "📖", "books_earned", earn_tiers)
 
     # ---------------------------------------------------------- Achievement count
-    ach_tiers = [(i * 5, f"{i * 5} achievements") for i in range(1, 61)]
+    # Raised so the big collector badges take real dedication.
+    ach_tiers = [(n, f"{n} achievements") for n in
+                 [5, 10, 20, 35, 50, 70, 90, 110, 130, 150, 175, 210, 245, 290, 350]]
     items += _tiered("ach", "special", "🏆", "achievements_earned", ach_tiers)
     items += [
-        Achievement("collector-bronze", "Bronze Collector", "Earn 25 achievements.", "special", "🥉", "rare", "achievements_earned", 25),
-        Achievement("collector-silver", "Silver Collector", "Earn 100 achievements.", "special", "🥈", "epic", "achievements_earned", 100),
-        Achievement("collector-gold", "Gold Collector", "Earn 250 achievements.", "special", "🥇", "legendary", "achievements_earned", 250),
-        Achievement("completionist", "Completionist", "Earn 500 achievements.", "special", "👑", "legendary", "achievements_earned", 500),
+        Achievement("collector-bronze", "Bronze Collector", "Earn 50 achievements.", "special", "🥉", "rare", "achievements_earned", 50),
+        Achievement("collector-silver", "Silver Collector", "Earn 200 achievements.", "special", "🥈", "epic", "achievements_earned", 200),
+        Achievement("collector-gold", "Gold Collector", "Earn 400 achievements.", "special", "🥇", "legendary", "achievements_earned", 400),
+        Achievement("completionist", "Completionist", "Earn 650 achievements.", "special", "👑", "legendary", "achievements_earned", 650),
     ]
 
     # ---------------------------------------------------------- Language variety
     lang_tiers = [(i, f"{i} language{'s' if i > 1 else ''} started") for i in range(1, len(LANGUAGES) + 1)]
     items += _tiered("polyglot", "special", "🌐", "languages_started", lang_tiers)
+    # Cross-language depth: reach a real foothold in many tracks at once.
+    for n in (2, 3, 5, 8):
+        items.append(Achievement(
+            f"deep-langs-{n}", f"{n} Languages Deep",
+            f"Complete at least 10 lessons in {n} different languages.",
+            "special", "🌐", "legendary" if n >= 5 else "epic", "langs_with_ten", n,
+        ))
+    for n in (3, 10, 25, 50):
+        items.append(Achievement(
+            f"daily-{n}", f"{n} Days Active",
+            f"Study on {n} different days.",
+            "special", "📅", "rare" if n < 25 else "legendary", "active_days", n,
+        ))
     items += [
         Achievement("polyglot-legend", "Polyglot Legend", "Reach 5 lessons in every language.", "special", "🧙", "legendary", "min_lessons_all_langs", 5),
         Achievement("night-owl", "Night Owl", "Study after midnight.", "special", "🦉", "rare", "night_sessions", 1),

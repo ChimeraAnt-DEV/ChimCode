@@ -54,6 +54,8 @@
       onboarded: false,
       onboarding: null,
       lastDay: "",
+      streakDay: null,
+      activeDays: [],
     };
   }
 
@@ -106,6 +108,40 @@
   function dayKey(ts) {
     const d = new Date((ts || Date.now()) * 1000);
     return d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
+  }
+
+  function dayIndex(ts) {
+    const d = new Date((ts || Date.now()) * 1000);
+    return Math.floor(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 86400000);
+  }
+
+  // The streak advances once per calendar day, when the user shows up — not
+  // per lesson. Missing a full day resets it to 1.
+  function checkDailyStreak() {
+    if (!S.user) return { advanced: false, streak: 0 };
+    const today = dayIndex();
+    const last = S.streakDay;
+    let advanced = false;
+    if (last === undefined || last === null) {
+      S.streakDay = today;
+      if (!S.user.streak) S.user.streak = 1;
+    } else if (today === last) {
+      // already counted today
+    } else if (today === last + 1) {
+      S.user.streak = (S.user.streak || 0) + 1;
+      S.streakDay = today;
+      advanced = true;
+    } else {
+      S.user.streak = 1;
+      S.streakDay = today;
+      advanced = true;
+    }
+    // Track distinct active days for the "days active" achievements.
+    S.activeDays = S.activeDays || [];
+    const key = dayKey();
+    if (S.activeDays.indexOf(key) < 0) S.activeDays.push(key);
+    persist();
+    return { advanced, streak: S.user.streak };
   }
 
   function bump(key, amount) {
@@ -166,6 +202,40 @@
     return out;
   }
 
+  // Per-language tallies for a specific kind of achievement: aces,
+  // challenges cleared, fully mastered lessons, and hint-free finishes.
+  function perLangStat(kind) {
+    const out = {};
+    Object.keys(S.progress).forEach((id) => {
+      const p = S.progress[id];
+      if (p.status !== "completed" && p.status !== "challenged") return;
+      const lang = p.language;
+      const aced = p.best_score >= 100;
+      const challenged = p.status === "challenged";
+      if (kind === "aces" && aced) out[lang] = (out[lang] || 0) + 1;
+      if (kind === "challenges" && challenged) out[lang] = (out[lang] || 0) + 1;
+      if (kind === "mastered" && aced && challenged) out[lang] = (out[lang] || 0) + 1;
+      if (kind === "nohints" && p.no_hints) out[lang] = (out[lang] || 0) + 1;
+    });
+    return out;
+  }
+
+  // Per language+level tallies for the "ace every beginner Python lesson"
+  // style achievements.
+  function perLevelStat(kind) {
+    const out = {};
+    Object.keys(S.progress).forEach((id) => {
+      const p = S.progress[id];
+      if (p.status !== "completed" && p.status !== "challenged") return;
+      const lesson = LESSON_INDEX[id];
+      if (!lesson) return;
+      const key = lesson.language + ":" + lesson.level;
+      if (kind === "aces" && p.best_score >= 100) out[key] = (out[key] || 0) + 1;
+      if (kind === "challenges" && p.status === "challenged") out[key] = (out[key] || 0) + 1;
+    });
+    return out;
+  }
+
   function derivedStats() {
     const completed = Object.values(S.progress).filter((p) => p.status === "completed" || p.status === "challenged");
     const perfect = completed.filter((p) => p.best_score >= 100).length;
@@ -202,12 +272,39 @@
       const p = S.progress[scope];
       return p && p.status === "challenged" ? 1 : 0;
     }
+    if (metricName === "no_hint_lesson") {
+      const p = S.progress[scope];
+      return p && p.no_hints ? 1 : 0;
+    }
+    if (metricName === "mastered_lesson") {
+      const p = S.progress[scope];
+      return p && p.best_score >= 100 && p.status === "challenged" ? 1 : 0;
+    }
+    if (metricName === "first_try_lesson") {
+      const p = S.progress[scope];
+      return p && p.attempts === 1 && p.best_score > 0 ? 1 : 0;
+    }
+    if (metricName === "perfect_nohint_lesson") {
+      const p = S.progress[scope];
+      return p && p.best_score >= 100 && p.no_hints ? 1 : 0;
+    }
     if (metricName === "lessons_in") return perLang()[scope] || 0;
+    if (metricName === "aces_in") return perLangStat("aces")[scope] || 0;
+    if (metricName === "challenges_in") return perLangStat("challenges")[scope] || 0;
+    if (metricName === "mastered_in") return perLangStat("mastered")[scope] || 0;
+    if (metricName === "nohint_in") return perLangStat("nohints")[scope] || 0;
     if (metricName === "lessons_in_level") return perLangLevel()[scope] || 0;
+    if (metricName === "aces_in_level") return perLevelStat("aces")[scope] || 0;
+    if (metricName === "challenges_in_level") return perLevelStat("challenges")[scope] || 0;
     if (metricName === "min_lessons_all_langs") {
       const pl = perLang();
       return Math.min.apply(null, Object.keys(LANG_INDEX).map((l) => pl[l] || 0));
     }
+    if (metricName === "langs_with_ten") {
+      const pl = perLang();
+      return Object.keys(LANG_INDEX).filter((l) => (pl[l] || 0) >= 10).length;
+    }
+    if (metricName === "active_days") return (S.activeDays || []).length;
     return stats[metricName] || 0;
   }
 
@@ -242,7 +339,7 @@
       })),
       achievementTotal: D.achievementTotal, achievementCategories: D.achievementCategories,
     }),
-    "GET /me": () => { requireUser(); return publicMe(); },
+    "GET /me": () => { requireUser(); checkDailyStreak(); return publicMe(); },
     "POST /heartbeat": () => ({ online: true }),
     "POST /auth/register": (b) => {
       const username = String(b.username || "").trim();
@@ -369,6 +466,8 @@
       best_score: best, updated_at: Math.floor(Date.now() / 1000),
       lesson_paid: lessonPaid || (report.passed && !isChallenge && challengeValid),
       challenge_paid: paid || (report.passed && isChallenge && challengeValid),
+      no_hints: (prev.no_hints ? 1 : 0) || (report.passed && !b.hints_used ? 1 : 0),
+      attempts: (prev.attempts || 0) + 1,
     };
 
     if (b.hints_used) bump("hints_used", b.hints_used); else bump("no_hint_lessons");
@@ -378,10 +477,6 @@
 
     const reward = { books: 0, xp: 0, repeated: false, needsChange: false, newAchievements: [] };
     if (report.passed) {
-      if (today !== S.lastDay) {
-        S.user.streak = (S.user.streak || 0) + 1;
-        S.lastDay = today;
-      }
       if (isChallenge) {
         if (!challengeValid) {
           reward.needsChange = true;
@@ -552,10 +647,14 @@
     }
     if (method === "GET" && (m = path.match(/^\/users\/(.+)$/))) {
       const name = decodeURIComponent(m[1]);
-      if (S.user && name === S.user.username) return Object.assign(publicMe(), {
-        achievementList: Object.keys(S.achievements).map((id) => Object.assign({}, ACH_INDEX[id], { earnedAt: S.achievements[id] })).filter(Boolean),
-        progress: Object.keys(S.progress).map((id) => S.progress[id]),
-      });
+      if (S.user && name === S.user.username) {
+        return Object.assign(publicMe(), {
+          achievementList: Object.keys(S.achievements).map((id) => Object.assign({}, ACH_INDEX[id], { earnedAt: S.achievements[id] })).filter(Boolean),
+          progress: Object.keys(S.progress).map((id) => S.progress[id]),
+          followers: 0,
+          following: S.following.length,
+        });
+      }
       const seed = SEED.find((s) => s.username === name);
       if (!seed) throw httpError(404, "User not found");
       const u = seedUser(seed);
@@ -574,6 +673,7 @@
     init() { load(); return true; },
     reset() { S = blank(); persist(); },
     hasAccount() { return !!S.user; },
+    dailyStreak() { requireUser(); return checkDailyStreak(); },
     call(path, method, body) {
       const m = (method || "GET").toUpperCase();
       const key = m + " " + path;

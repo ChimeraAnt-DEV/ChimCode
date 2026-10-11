@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS users (
     bio           TEXT NOT NULL DEFAULT '',
     books         INTEGER NOT NULL DEFAULT 120,
     streak        INTEGER NOT NULL DEFAULT 0,
+    streak_day    TEXT NOT NULL DEFAULT '',
     xp            INTEGER NOT NULL DEFAULT 0,
     super_until   INTEGER NOT NULL DEFAULT 0,
     is_public     INTEGER NOT NULL DEFAULT 1,
@@ -53,6 +54,8 @@ CREATE TABLE IF NOT EXISTS lesson_progress (
     language    TEXT NOT NULL,
     status      TEXT NOT NULL DEFAULT 'in_progress',
     best_score  INTEGER NOT NULL DEFAULT 0,
+    no_hints    INTEGER NOT NULL DEFAULT 0,
+    attempts    INTEGER NOT NULL DEFAULT 0,
     updated_at  INTEGER NOT NULL,
     PRIMARY KEY (user_id, lesson_id)
 );

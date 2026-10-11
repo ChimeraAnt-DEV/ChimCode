@@ -178,14 +178,33 @@ def user_stats(conn, user_id: int) -> dict[str, int]:
     s["super_days"] = s.get("super_days", 0)
 
     per_lang: dict[str, int] = {}
+    aces_per_lang: dict[str, int] = {}
+    chal_per_lang: dict[str, int] = {}
+    mastered_per_lang: dict[str, int] = {}
+    nohint_per_lang: dict[str, int] = {}
     for p in completed:
-        per_lang[p["language"]] = per_lang.get(p["language"], 0) + 1
+        lang = p["language"]
+        per_lang[lang] = per_lang.get(lang, 0) + 1
+        if p["best_score"] >= 100:
+            aces_per_lang[lang] = aces_per_lang.get(lang, 0) + 1
+        if p["status"] == "challenged":
+            chal_per_lang[lang] = chal_per_lang.get(lang, 0) + 1
+        if p["best_score"] >= 100 and p["status"] == "challenged":
+            mastered_per_lang[lang] = mastered_per_lang.get(lang, 0) + 1
+        if p["no_hints"]:
+            nohint_per_lang[lang] = nohint_per_lang.get(lang, 0) + 1
     per_lang_level: dict[str, int] = {}
+    aces_lang_level: dict[str, int] = {}
+    chal_lang_level: dict[str, int] = {}
     for p in completed:
         lesson = LESSON_INDEX.get(p["lesson_id"])
         if lesson:
             key = f"{lesson.language}:{lesson.level}"
             per_lang_level[key] = per_lang_level.get(key, 0) + 1
+            if p["best_score"] >= 100:
+                aces_lang_level[key] = aces_lang_level.get(key, 0) + 1
+            if p["status"] == "challenged":
+                chal_lang_level[key] = chal_lang_level.get(key, 0) + 1
 
     friends = conn.execute("SELECT COUNT(*) c FROM friendships WHERE user_id = ?", (user_id,)).fetchone()["c"]
     followers = conn.execute("SELECT COUNT(*) c FROM follows WHERE followee_id = ?", (user_id,)).fetchone()["c"]
@@ -198,7 +217,13 @@ def user_stats(conn, user_id: int) -> dict[str, int]:
     ).fetchone()["c"]
     s["streak"] = conn.execute("SELECT streak FROM users WHERE id = ?", (user_id,)).fetchone()["streak"]
     s["_per_lang"] = per_lang
+    s["_aces_per_lang"] = aces_per_lang
+    s["_chal_per_lang"] = chal_per_lang
+    s["_mastered_per_lang"] = mastered_per_lang
+    s["_nohint_per_lang"] = nohint_per_lang
     s["_per_lang_level"] = per_lang_level
+    s["_aces_per_lang_level"] = aces_lang_level
+    s["_chal_per_lang_level"] = chal_lang_level
     return s
 
 
@@ -221,13 +246,54 @@ def metric_value(metric: str, scope: str, stats: dict[str, int], conn, user_id: 
             (user_id, scope),
         ).fetchone()
         return 1 if row and row["status"] == "challenged" else 0
+    if metric == "no_hint_lesson":
+        row = conn.execute(
+            "SELECT no_hints FROM lesson_progress WHERE user_id = ? AND lesson_id = ?",
+            (user_id, scope),
+        ).fetchone()
+        return 1 if row and row["no_hints"] else 0
+    if metric == "mastered_lesson":
+        row = conn.execute(
+            "SELECT best_score, status FROM lesson_progress WHERE user_id = ? AND lesson_id = ?",
+            (user_id, scope),
+        ).fetchone()
+        return 1 if row and row["best_score"] >= 100 and row["status"] == "challenged" else 0
+    if metric == "first_try_lesson":
+        row = conn.execute(
+            "SELECT attempts FROM lesson_progress WHERE user_id = ? AND lesson_id = ?",
+            (user_id, scope),
+        ).fetchone()
+        return 1 if row and row["attempts"] == 1 and row["best_score"] > 0 else 0
+    if metric == "perfect_nohint_lesson":
+        row = conn.execute(
+            "SELECT best_score, no_hints FROM lesson_progress WHERE user_id = ? AND lesson_id = ?",
+            (user_id, scope),
+        ).fetchone()
+        return 1 if row and row["best_score"] >= 100 and row["no_hints"] else 0
     if metric == "lessons_in":
         return stats.get("_per_lang", {}).get(scope, 0)
+    if metric == "aces_in":
+        return stats.get("_aces_per_lang", {}).get(scope, 0)
+    if metric == "challenges_in":
+        return stats.get("_chal_per_lang", {}).get(scope, 0)
+    if metric == "mastered_in":
+        return stats.get("_mastered_per_lang", {}).get(scope, 0)
+    if metric == "nohint_in":
+        return stats.get("_nohint_per_lang", {}).get(scope, 0)
     if metric == "lessons_in_level":
         return stats.get("_per_lang_level", {}).get(scope, 0)
+    if metric == "aces_in_level":
+        return stats.get("_aces_per_lang_level", {}).get(scope, 0)
+    if metric == "challenges_in_level":
+        return stats.get("_chal_per_lang_level", {}).get(scope, 0)
     if metric == "min_lessons_all_langs":
         per_lang = stats.get("_per_lang", {})
         return min((per_lang.get(l, 0) for l in LANGUAGES), default=0)
+    if metric == "langs_with_ten":
+        per_lang = stats.get("_per_lang", {})
+        return sum(1 for l in LANGUAGES if per_lang.get(l, 0) >= 10)
+    if metric == "active_days":
+        return stats.get("_active_days", 0)
     if metric == "is_public":
         return stats.get("is_public", 0)
     return stats.get(metric, 0)
@@ -277,6 +343,40 @@ def public_user(conn, user: dict[str, Any], viewer_id: int | None = None) -> dic
 
 def public_item_map() -> dict[str, dict[str, Any]]:
     return {i.id: i.public() for i in shop.ITEMS}
+
+
+def check_daily_streak(conn, user_id: int) -> int:
+    """Advance the streak at most once per calendar day when the user shows up."""
+    row = conn.execute("SELECT streak, streak_day FROM users WHERE id = ?", (user_id,)).fetchone()
+    today = time.strftime("%Y-%m-%d", time.localtime())
+    streak = row["streak"]
+    last = row["streak_day"] or ""
+    if last == today:
+        return streak
+    yesterday = time.strftime("%Y-%m-%d", time.localtime(now() - 86400))
+    if last == "":
+        streak = max(streak, 1)
+    elif last == yesterday:
+        streak += 1
+    else:
+        streak = 1
+    conn.execute("UPDATE users SET streak = ?, streak_day = ? WHERE id = ?", (streak, today, user_id))
+    return streak
+
+
+def record_active_day(conn, user_id: int) -> None:
+    """Count each distinct calendar day the user showed up on."""
+    today = time.strftime("%Y-%m-%d", time.localtime())
+    key = "_active_day_" + today
+    existing = conn.execute(
+        "SELECT 1 FROM stats WHERE user_id = ? AND key = ?", (user_id, key)
+    ).fetchone()
+    if existing:
+        return
+    conn.execute(
+        "INSERT OR IGNORE INTO stats (user_id, key, value) VALUES (?, ?, 1)", (user_id, key)
+    )
+    bump_stat(conn, user_id, "active_days", 1)
 
 
 # --------------------------------------------------------------------- auth
@@ -329,7 +429,10 @@ def login(body: LoginIn):
 def me(user: dict = Depends(current_user)):
     touch(user["id"])
     with db() as conn:
-        return public_user(conn, user, user["id"])
+        check_daily_streak(conn, user["id"])
+        record_active_day(conn, user["id"])
+        fresh = conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
+        return public_user(conn, dict(fresh), user["id"])
 
 
 @app.post("/api/heartbeat")
@@ -390,15 +493,19 @@ def submit(body: SubmitIn, user: dict = Depends(current_user)):
         touch(user["id"])
         status = "completed" if report["passed"] else "in_progress"
         prev = conn.execute(
-            "SELECT status, best_score FROM lesson_progress WHERE user_id = ? AND lesson_id = ?",
+            "SELECT status, best_score, attempts FROM lesson_progress WHERE user_id = ? AND lesson_id = ?",
             (user["id"], lesson.id),
         ).fetchone()
         best = max(report["score"], prev["best_score"] if prev else 0)
+        no_hints = 0 if body.hints_used else (1 if report["passed"] else 0)
+        attempts = (prev["attempts"] if prev else 0) + 1
         conn.execute(
-            "INSERT INTO lesson_progress (user_id, lesson_id, language, status, best_score, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, lesson_id) DO UPDATE SET "
-            "status = excluded.status, best_score = excluded.best_score, updated_at = excluded.updated_at",
-            (user["id"], lesson.id, lesson.language, status, best, now()),
+            "INSERT INTO lesson_progress (user_id, lesson_id, language, status, best_score, no_hints, attempts, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, lesson_id) DO UPDATE SET "
+            "status = excluded.status, best_score = excluded.best_score, "
+            "no_hints = MAX(no_hints, excluded.no_hints), "
+            "attempts = attempts + 1, updated_at = excluded.updated_at",
+            (user["id"], lesson.id, lesson.language, status, best, no_hints, attempts, now()),
         )
         if body.hints_used:
             bump_stat(conn, user["id"], "hints_used", body.hints_used)

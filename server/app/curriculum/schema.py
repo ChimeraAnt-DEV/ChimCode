@@ -30,6 +30,9 @@ class Lesson:
     quiz: Quiz | None = None
     challenge: str = ""
     challenge_starter: str = ""
+    # A known-correct solution. Used for the "type this next" hint and the
+    # narrated walkthrough, so those never point at code that fails the task.
+    solution: str = ""
     tags: list[str] = field(default_factory=list)
 
     def public(self) -> dict[str, Any]:
@@ -47,6 +50,7 @@ class Lesson:
             "hints": self.hints,
             "challenge": self.challenge,
             "challengeStarter": self.challenge_starter,
+            "solution": self.solution,
             "tags": self.tags,
         }
 

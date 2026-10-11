@@ -234,19 +234,85 @@ def grade(lesson, code: str) -> dict[str, Any]:
 
 
 def ghost_for(lesson, code: str, results: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """Build a transparent 'type here' hint for the first unmet requirement."""
-    unmet = [c for c in lesson.checks if c.get("message") and not any(
-        r["message"] == c["message"] and r["ok"] for r in results)]
-    if not unmet:
-        return None
-    check = unmet[0]
-    value = str(check.get("value", ""))
-    if check.get("type") == "regex":
-        value = _regex_to_placeholder(value)
+    """Build a precise 'type this' hint.
+
+    We compare the learner's code against the reference solution line by line
+    and return the exact next line they still need, plus its position. That is
+    far more specific than echoing a check's value, which was often a fragment
+    like 'print(' that left the learner guessing.
+    """
+    lines = code.split("\n")
+    typed = [ln.rstrip() for ln in lines]
+
+    # 1. If a line has an obvious syntax problem, point at that exact fix.
+    issues = analyze(lesson.language, code)
+    for issue in issues:
+        if issue.get("ghost"):
+            return {
+                "message": issue["message"],
+                "text": issue["ghost"],
+                "line": issue.get("line", len(lines)),
+                "column": issue.get("column"),
+                "mode": "insert",
+            }
+
+    # 2. Otherwise walk the reference solution and find the first line that is
+    #    missing or still wrong. Only do this when the reference genuinely
+    #    satisfies the checks, so we never point at code that fails the task.
+    reference = _reference_solution(lesson)
+    reference_passes = all(_check_ok(c, reference)[0] for c in lesson.checks)
+    ref = [ln for ln in reference.split("\n") if ln.strip()]
+    unmet = [
+        c for c in lesson.checks
+        if c.get("message") and not any(r["message"] == c["message"] and r["ok"] for r in results)
+    ]
+    if not reference_passes or not ref:
+        if not unmet:
+            return None
+        check = unmet[0]
+        value = str(check.get("value", ""))
+        if check.get("type") == "regex":
+            value = _regex_to_placeholder(value)
+        return {"message": check.get("message", "Add the missing piece here."),
+                "text": value, "line": len(lines), "mode": "insert"}
+
+    # Skip past the lines the learner already got right.
+    idx = 0
+    for ln in typed:
+        stripped = ln.strip()
+        if not stripped:
+            continue
+        if idx < len(ref) and (stripped == ref[idx].strip() or stripped in ref[idx]):
+            idx += 1
+    if idx >= len(ref):
+        if not unmet:
+            return None
+        check = unmet[0]
+        value = str(check.get("value", ""))
+        if check.get("type") == "regex":
+            value = _regex_to_placeholder(value)
+        return {"message": check.get("message", "Add the missing piece here."),
+                "text": value, "line": len(lines), "mode": "insert"}
+
+    expected = ref[idx]
+    # For a 'contains' requirement, the specific missing token is more useful
+    # than the whole line when the learner is mid-line.
+    if unmet:
+        check = unmet[0]
+        value = str(check.get("value", ""))
+        if check.get("type") == "regex":
+            value = _regex_to_placeholder(value)
+        if value and value not in code and len(value) <= len(expected):
+            return {
+                "message": check.get("message", "Add this to satisfy the requirement."),
+                "text": value, "line": len(lines), "mode": "insert",
+            }
+
     return {
-        "message": check.get("message", "Add the missing piece here."),
-        "text": value,
-        "line": len(code.split("\n")),
+        "message": "Next line — type this exactly:",
+        "text": expected.strip(),
+        "line": len(lines) + 1,
+        "mode": "newline",
     }
 
 
@@ -276,25 +342,62 @@ CONCEPT_TALK = {
 
 
 def bot_explain(lesson, code: str, question: str = "") -> dict[str, Any]:
-    """Produce Mochi's structured coaching reply for a lesson + submission."""
+    """Produce Mochi's structured coaching reply for a lesson + submission.
+
+    The reply is built from the real state of the learner's code: what is
+    already correct, what is still missing, and any syntax errors.
+    """
     report = grade(lesson, code)
     concept = lesson.concept.lower()
     talk = next((v for k, v in CONCEPT_TALK.items() if k in concept), None)
 
-    steps = []
-    for i, t in enumerate(lesson.theory, start=1):
-        steps.append({"title": f"Step {i}", "detail": t})
+    checks = lesson.checks
+    done = [c for c in checks if any(r["message"] == c.get("message") and r["ok"] for r in report["checks"])]
+    unmet = [c for c in checks if c.get("message") and not any(
+        r["message"] == c["message"] and r["ok"] for r in report["checks"])]
+    errors = [i for i in report["issues"] if i["severity"] == "error"]
 
-    issues = report["issues"]
-    if issues:
-        focus = issues[0]
-        spoken = (
-            f"I spotted something on line {focus['line']}. "
-            f"{focus['message']} {('You should ' + focus['expected'] + '.') if focus['expected'] else ''} "
-            "Let me walk you through it."
-        )
+    steps = []
+    if done:
+        steps.append({
+            "title": "Already working",
+            "detail": f"You have {len(done)} of {len(checks)} requirements right: "
+                      + "; ".join(c["message"].rstrip(".") for c in done) + ".",
+        })
+    for i, c in enumerate(unmet[:3], start=1):
+        steps.append({"title": f"Still needed {i}", "detail": c["message"]})
+    for i, t in enumerate(lesson.theory[:3], start=1):
+        steps.append({"title": f"Concept {i}", "detail": t})
+
+    q = (question or "").lower()
+    if q and any(w in q for w in ("why", "wrong", "error", "not work", "broken", "fail")):
+        if errors:
+            f = errors[0]
+            spoken = f"Line {f['line']}: {f['message']}"
+            if f.get("expected"):
+                spoken += f" Fix it by {f['expected']}."
+        elif unmet:
+            spoken = f"Nothing is broken syntactically. What is missing is: {unmet[0]['message']} I would add that next."
+        else:
+            spoken = "Your code passes every check. Tell me what you expected to happen."
+    elif q and any(w in q for w in ("hint", "help", "stuck", "how")):
+        if unmet:
+            hint = f" Try: {lesson.hints[0]}" if lesson.hints else ""
+            spoken = f"You still need to {unmet[0]['message'].rstrip('.')}.{hint}"
+        else:
+            spoken = "You are actually done. Try the challenge to prove it sticks."
+    elif q and any(w in q for w in ("what", "explain", "meaning", "mean")):
+        spoken = f"{talk or lesson.task} In this lesson, {concept} is the whole point."
+    elif errors:
+        f = errors[0]
+        extra = f" You should {f['expected']}." if f.get("expected") else ""
+        spoken = f"I found {len(errors)} error(s). The first is on line {f['line']}: {f['message']}{extra} Let me show you."
     elif report["passed"]:
-        spoken = "Beautiful work. Every requirement is met and I found no mistakes. Want to try the challenge?"
+        spoken = (f"That is correct — all {len(checks)} requirements are met and the code is clean. "
+                  "Try the challenge next, or teach it back to me in your own words.")
+    elif unmet:
+        pct = round(100 * len(done) / len(checks)) if checks else 0
+        spoken = f"You are {pct}% of the way there. The next thing to add is: {unmet[0]['message']}"
     else:
         spoken = "You are close. Let me point at the exact requirement that still needs your attention."
 
@@ -302,7 +405,7 @@ def bot_explain(lesson, code: str, question: str = "") -> dict[str, Any]:
         "spoken": spoken,
         "summary": talk or lesson.task,
         "steps": steps,
-        "issues": issues,
+        "issues": report["issues"],
         "checks": report["checks"],
         "passed": report["passed"],
         "score": report["score"],
@@ -343,12 +446,17 @@ def walkthrough(lesson) -> dict[str, Any]:
 
 
 def _reference_solution(lesson) -> str:
-    """Best-effort reference answer, preferring the lesson example when it satisfies checks."""
-    candidates = [lesson.example]
-    for candidate in candidates:
-        if candidate and all(_check_ok(c, candidate)[0] for c in lesson.checks):
-            return candidate
-    # Fall back to the example with starter scaffolding prepended.
+    """The solution used for hints and walkthroughs.
+
+    Prefer an explicit lesson.solution, then the example when it satisfies the
+    checks, then the starter as a last resort.
+    """
+    if lesson.solution and all(_check_ok(c, lesson.solution)[0] for c in lesson.checks):
+        return lesson.solution
+    if lesson.example and all(_check_ok(c, lesson.example)[0] for c in lesson.checks):
+        return lesson.example
+    if lesson.solution:
+        return lesson.solution
     return (lesson.starter + "\n" + lesson.example).strip() if lesson.starter else lesson.example
 
 

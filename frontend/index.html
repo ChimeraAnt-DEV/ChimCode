@@ -25,6 +25,19 @@
   <div id="toasts" class="toasts" aria-live="polite"></div>
   <div id="mode-badge" class="mode-badge hidden"></div>
 
+  <!-- Cinematic intro loader -->
+  <div id="intro" class="intro">
+    <canvas id="intro-canvas"></canvas>
+    <div class="intro-core">
+      <div class="intro-ring"></div>
+      <div class="intro-ring intro-ring-2"></div>
+      <div class="intro-mark" data-icon="robot" data-size="84"></div>
+    </div>
+    <div class="intro-title">Chim<em>Code</em></div>
+    <div class="intro-sub" id="intro-status">Booting tutor engine…</div>
+    <div class="intro-bar"><i id="intro-bar-fill"></i></div>
+  </div>
+
   <!-- Landing / auth -->
   <main id="gate" class="gate">
     <section class="gate-hero">
@@ -41,11 +54,11 @@
       <ul class="hero-points">
         <li><span data-icon="robot"></span> A 2D robot that hovers over your mistakes and explains out loud</li>
         <li><span data-icon="sparkle"></span> Transparent ghost text that shows what to type next</li>
-        <li><span data-icon="trophy"></span> 707 achievements, profiles, followers and online status</li>
+        <li><span data-icon="trophy"></span> 950+ achievements, profiles, followers and online status</li>
         <li><span data-icon="book"></span> Earn Books, spend them on cosmetics, effects and Super Days</li>
       </ul>
       <div class="hero-stats">
-        <div><strong id="stat-ach">707</strong><span>achievements</span></div>
+        <div><strong id="stat-ach">955</strong><span>achievements</span></div>
         <div><strong id="stat-langs">11</strong><span>languages</span></div>
         <div><strong id="stat-lessons">50+</strong><span>lessons</span></div>
       </div>
@@ -152,6 +165,9 @@
 
   <script src="data/chimdata.js"></script>
   <script src="icons.js"></script>
+  <script src="intro.js"></script>
+  <script src="duel.js"></script>
+  <script src="coach.js"></script>
   <script src="engine.js"></script>
   <script src="local.js"></script>
   <script src="api.js"></script>

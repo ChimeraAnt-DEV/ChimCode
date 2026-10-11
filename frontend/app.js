@@ -394,6 +394,17 @@
       onMistake: (issue) => {
         state.bot && state.bot.setState("sad");
         state.bot && state.bot.talk(1600);
+        // Mochi speaks up on its own the first time it sees a given mistake,
+        // so the learner is not left staring at a silent red line.
+        const key = issue.code + ":" + issue.line;
+        state.seenMistakes = state.seenMistakes || {};
+        if (!state.seenMistakes[key]) {
+          state.seenMistakes[key] = true;
+          const say = issue.expected
+            ? issue.message + " You should " + issue.expected + "."
+            : issue.message;
+          botSay(say);
+        }
       },
     });
     state.lastCode = state.editor.getValue();
@@ -659,10 +670,14 @@
   async function activateSuperDay() {
     try {
       const r = await api("/superday/buy", { method: "POST" });
-      toast("star", "Super Day activated!", "For the next 24 hours Mochi explains hard stuff endlessly.", "good");
       celebrate(r.newAchievements);
-      state.me = await api("/me"); refreshHud();
-      if (state.lesson) openLesson(state.lesson.id);
+      state.me = await api("/me");
+      refreshHud();
+      // Play the anime-style duel, then reveal the menu when the fight is over.
+      window.ChimDuel.play(() => {
+        toast("star", "Super Day activated!", "For the next 24 hours Mochi explains hard stuff endlessly.", "good");
+        if (state.lesson) openLesson(state.lesson.id);
+      });
     } catch (e) { toast("alert", "Cannot activate", e.message, "bad"); }
   }
 
@@ -690,25 +705,57 @@
     });
   }
 
+  // Watch Mochi: an animated scene where Mochi walks to the task, raises a
+  // holographic keyboard and types the code while explaining it in English.
   function openWalkthrough(lesson, wt) {
-    modal("Mochi walks you through it", (body) => {
-      body.appendChild(pEl(wt.spoken || "Watch closely. I will explain every line."));
-      const wrap = el("div");
-      wt.narration.forEach((n, i) => {
-        const row = el("div", "walkthrough-line");
-        row.innerHTML = '<code>' + escapeHtml(n.code || " ") + '</code><div class="wt-note">' + escapeHtml(n.note) + "</div>";
-        wrap.appendChild(row);
-        setTimeout(() => {
-          row.classList.add("active");
-          if (row.scrollIntoView) row.scrollIntoView({ block: "nearest" });
-          if (i === 0) mochiVoice.speak(n.note);
-        }, 550 * (i + 1));
-      });
-      body.appendChild(wrap);
-      const note = el("p");
-      note.style.marginTop = "14px";
-      note.textContent = "Mochi never types it for you. Retype each line yourself — that is how it sticks.";
-      body.appendChild(note);
+    modal("Watch Mochi build it", (body) => {
+      const stage = el("div", "coach-stage");
+      const canvas = document.createElement("canvas");
+      stage.appendChild(canvas);
+      body.appendChild(stage);
+
+      const spoken = el("p", "coach-said");
+      spoken.textContent = wt.spoken || "Watch closely — I will type it and explain every line.";
+      body.appendChild(spoken);
+
+      const caption = el("div", "coach-caption");
+      body.appendChild(caption);
+
+      const codeBox = el("div", "coach-code");
+      body.appendChild(codeBox);
+
+      const controls = el("div", "done-actions");
+      const replay = el("button", "btn btn-ghost");
+      replay.innerHTML = ic("redo", 15) + "Replay";
+      const got = el("button", "btn btn-primary");
+      got.innerHTML = ic("check", 15) + "Got it";
+      got.addEventListener("click", closeModal);
+      controls.append(replay, got);
+      body.appendChild(controls);
+
+      let coach = null;
+      const narration = wt.narration || [];
+      const start = () => {
+        if (coach) coach.stop();
+        caption.innerHTML = "";
+        codeBox.innerHTML = "";
+        coach = new window.ChimCoach.Coach(canvas, (n, i) => {
+          caption.innerHTML = "<b>Line " + n.line + "</b> " + escapeHtml(n.note);
+          const lineEl = el("code");
+          lineEl.textContent = n.code || " ";
+          lineEl.style.animationDelay = "0s";
+          codeBox.appendChild(lineEl);
+          mochiVoice.speak(n.note);
+        });
+        coach.setLines(narration);
+      };
+      replay.addEventListener("click", start);
+      start();
+      const cleanup = () => { if (coach) coach.stop(); };
+      // Stop the animation when the modal closes.
+      const backdrop = body.closest(".modal-backdrop");
+      if (backdrop) backdrop.addEventListener("click", cleanup);
+      got.addEventListener("click", cleanup);
     });
     state.dockBot.setState("talking");
   }
@@ -720,6 +767,17 @@
     const head = el("div", "section-head");
     head.innerHTML = "<div><p class='eyebrow'>Community</p><h2>See who is coding right now</h2><p>Profiles, achievements, online status and progress.</p></div>";
     view.appendChild(head);
+
+    // Be honest about where the people come from.
+    const note = el("div", "notice");
+    if (window.ChimAPI.mode === "server") {
+      note.innerHTML = ic("globe", 16) + " Connected to a shared server — these are real coders you can follow.";
+    } else {
+      note.innerHTML = ic("alert", 16) +
+        " You are offline, so these are sample coders shown as a demo of the community. " +
+        "Run the included server (see the README) to compete with real people across devices.";
+    }
+    view.appendChild(note);
 
     const cols = el("div");
     cols.style.cssText = "display:grid;grid-template-columns:1.4fr 1fr;gap:22px;align-items:start";
@@ -848,18 +906,21 @@
         card.appendChild(preview);
         card.innerHTML += "<b>" + escapeHtml(item.name) + "</b><p style='font-size:12.5px'>" + escapeHtml(item.description) + "</p>" +
           '<div class="si-price">' + (item.price === 0 ? "Free" : item.price + " Books") + "</div>";
-        if (item.owned) card.innerHTML += '<span class="badge-owned ' + (item.equipped ? "badge-equipped" : "") + '">' + (item.equipped ? "Equipped" : "Owned") + "</span>";
+        if (item.owned) card.innerHTML += '<span class="badge-owned ' + (item.equipped ? "badge-equipped" : "") + '">' + (item.equipped ? "In use" : "Owned") + "</span>";
         const actions = el("div", "si-actions");
         if (!item.owned) {
-          const buy = el("button", "btn btn-sm btn-primary"); buy.textContent = "Buy";
+          const buy = el("button", "btn btn-sm btn-primary");
+          buy.innerHTML = ic("cart", 14) + "Buy";
           buy.addEventListener("click", () => buyItem(item.id, view));
           actions.appendChild(buy);
         } else if (!item.equipped) {
-          const eq = el("button", "btn btn-sm"); eq.textContent = "Equip";
+          const eq = el("button", "btn btn-sm btn-primary");
+          eq.innerHTML = ic("check", 14) + "Use";
           eq.addEventListener("click", () => equipItem(item.id, view));
           actions.appendChild(eq);
         } else {
-          const un = el("button", "btn btn-sm btn-ghost"); un.textContent = "Unequip";
+          const un = el("button", "btn btn-sm btn-ghost");
+          un.innerHTML = ic("x", 14) + "Remove";
           un.addEventListener("click", () => unequipItem(item.slot, view));
           actions.appendChild(un);
         }
@@ -930,7 +991,7 @@
       ["users", profile.followers, "Followers"],
     ].forEach(([i, v, l]) => {
       const s = el("div", "stat");
-      s.innerHTML = "<b>" + i + " " + v + "</b><span>" + l + "</span>";
+      s.innerHTML = "<b>" + ic(i, 15) + " " + v + "</b><span>" + l + "</span>";
       statRow.appendChild(s);
     });
     meta.appendChild(statRow);
@@ -977,42 +1038,125 @@
     view.appendChild(earned);
   }
 
+  // A proper customisation studio: profile details plus every cosmetic the
+  // player owns, grouped by slot, with instant equip.
   function openEditProfile(profile, view) {
-    modal("Edit profile", (body) => {
+    modal("Customise profile", (body) => {
+      const tabs = el("div", "seg");
+      const details = el("div");
+      const closet = el("div");
+      const detailBtn = el("button", "seg-btn active"); detailBtn.textContent = "Profile";
+      const closetBtn = el("button", "seg-btn"); closetBtn.textContent = "Cosmetics";
+      tabs.append(detailBtn, closetBtn);
+      body.append(tabs, details, closet);
+
+      // ---- details tab
       const form = el("div");
       form.style.display = "grid";
       form.style.gap = "14px";
+      const avatars = (window.CHIMDATA.storeSlots ? [] : []);
       form.innerHTML =
-        "<label>Username (change anytime)<input id='pf-username' value='" + escapeHtml(profile.username) + "' /></label>" +
-        "<label>Bio<textarea id='pf-bio' rows='3' maxlength='280'>" + escapeHtml(profile.bio) + "</textarea></label>" +
-        "<label>Avatar emoji<input id='pf-pfp' value='" + escapeHtml(profile.pfp) + "' /></label>" +
-        "<label>Avatar colour<input id='pf-color' type='color' value='" + escapeHtml(profile.pfpColor || "#7c5cff") + "' /></label>" +
-        "<label><input id='pf-public' type='checkbox' " + (profile.public ? "checked" : "") + " /> Public profile (others can see your progress)</label>";
-      body.appendChild(form);
+        "<label>Username<input id='pf-username' maxlength='20' value='" + escapeHtml(profile.username) + "' /></label>" +
+        "<label>Bio<textarea id='pf-bio' rows='3' maxlength='280' placeholder='Tell other coders what you build…'>" + escapeHtml(profile.bio) + "</textarea></label>" +
+        "<label>Accent colour<input id='pf-color' type='color' value='" + escapeHtml(profile.pfpColor || "#7c5cff") + "' /></label>" +
+        "<label class='pf-check'><input id='pf-public' type='checkbox' " + (profile.public ? "checked" : "") + " /> Public profile — let others see my progress</label>";
+      details.appendChild(form);
+
+      const avatarWrap = el("div");
+      avatarWrap.innerHTML = "<p class='pf-label'>Avatar</p>";
+      const avRow = el("div", "pf-avatars");
+      const AVATARS = ["chim-01", "ava-astro", "ava-neon", "ava-flame", "ava-void", "ava-dragon", "ava-crown", "ava-prism"];
+      let chosen = profile.pfp;
+      AVATARS.forEach((id) => {
+        const b = el("button", "pf-avatar" + (id === chosen ? " active" : ""));
+        b.innerHTML = avatarGlyph(id);
+        b.style.background = itemGradient(id);
+        b.title = id;
+        b.addEventListener("click", () => {
+          chosen = id;
+          Array.from(avRow.children).forEach((c) => c.classList.toggle("active", c === b));
+          save({ pfp: chosen, pfp_color: $("#pf-color").value });
+        });
+        avRow.appendChild(b);
+      });
+      avatarWrap.appendChild(avRow);
+      details.appendChild(avatarWrap);
+
       const save = el("button", "btn btn-primary btn-block");
-      save.style.marginTop = "16px";
-      save.textContent = "Save changes";
+      save.style.marginTop = "18px";
+      save.textContent = "Save profile";
       save.addEventListener("click", async () => {
-        try {
-          await api("/profile", { method: "POST", body: {
-            bio: $("#pf-bio").value,
-            pfp: $("#pf-pfp").value,
-            pfp_color: $("#pf-color").value,
-            is_public: $("#pf-public").checked,
-          }});
-          const newName = $("#pf-username").value.trim();
-          if (newName && newName !== profile.username) {
+        await saveProfile({
+          bio: $("#pf-bio").value,
+          pfp: chosen,
+          pfp_color: $("#pf-color").value,
+          is_public: $("#pf-public").checked,
+        });
+        const newName = $("#pf-username").value.trim();
+        if (newName && newName !== profile.username) {
+          try {
             const r = await api("/username", { method: "POST", body: { username: newName } });
             if (r.token) { state.token = r.token; localStorage.setItem("chimcode_token", r.token); }
-          }
+          } catch (e) { toast("alert", "Username taken", e.message, "bad"); }
+        }
+        state.me = await api("/me");
+        refreshHud();
+        toast("check", "Profile saved", "", "good");
+        renderProfile(view);
+      });
+      details.appendChild(save);
+
+      async function saveProfile(patch) {
+        try {
+          await api("/profile", { method: "POST", body: patch });
           state.me = await api("/me");
           refreshHud();
-          closeModal();
-          toast("check", "Profile saved", "", "good");
           renderProfile(view);
         } catch (e) { toast("alert", "Could not save", e.message, "bad"); }
+      }
+
+      // ---- cosmetics tab (equip owned items)
+      const closetBody = el("div");
+      closet.appendChild(closetBody);
+      let closetBuilt = false;
+      closetBtn.addEventListener("click", async () => {
+        detailBtn.classList.remove("active"); closetBtn.classList.add("active");
+        details.classList.add("hidden"); closet.classList.remove("hidden");
+        if (closetBuilt) return;
+        closetBuilt = true;
+        closetBody.innerHTML = '<div class="spinner"></div>';
+        try {
+          const shop = await api("/shop");
+          closetBody.innerHTML = "";
+          closetBody.appendChild(el("p", "pf-label")).textContent = "";
+          Object.keys(shop.grouped).forEach((slot) => {
+            const owned = shop.grouped[slot].filter((i) => i.owned);
+            if (!owned.length) return;
+            const h = el("p", "pf-label");
+            h.textContent = shop.slots[slot];
+            closetBody.appendChild(h);
+            const row = el("div", "pf-grid");
+            owned.forEach((item) => {
+              const b = el("button", "pf-item" + (item.equipped ? " active" : ""));
+              b.innerHTML = ic(item.icon, 26) + "<span>" + escapeHtml(item.name) + "</span>";
+              b.addEventListener("click", async () => {
+                try {
+                  await api("/shop/equip/" + item.id, { method: "POST" });
+                  state.me = await api("/me");
+                  refreshHud();
+                  toast("check", "Equipped", item.name, "good");
+                  renderProfile(view);
+                  Array.from(row.children).forEach((c) => c.classList.toggle("active", c === b));
+                } catch (e) { toast("alert", "Could not equip", e.message, "bad"); }
+              });
+              row.appendChild(b);
+            });
+            closetBody.appendChild(row);
+          });
+        } catch (e) {
+          closetBody.innerHTML = "<p>Could not load your cosmetics.</p>";
+        }
       });
-      body.appendChild(save);
     });
   }
 
@@ -1268,10 +1412,41 @@
   }
 
   async function boot() {
-    // Pick a backend first: local (no server needed) or a reachable server.
-    try { await window.ChimAPI.boot(); } catch (e) { /* local always works */ }
-
     hydrateIcons(document);
+
+    // Run the cinematic intro while we figure out where the user should land.
+    let destination = null;
+    await window.ChimIntro.run({
+      work: async () => {
+        try { await window.ChimAPI.boot(); } catch (e) { /* local always works */ }
+        // Decide the destination during the animation so there is no flash
+        // of the login screen for someone who is already signed in.
+        try {
+          state.me = await api("/me");
+          destination = "app";
+        } catch (e) {
+          state.me = null;
+          destination = "gate";
+        }
+      },
+      destination: () => {
+        if (destination === "app") {
+          enterApp().catch(showGate);
+        } else {
+          wireAuthOnce();
+          showGate();
+        }
+      },
+    });
+
+    wireAuthOnce();
+    setIntervalIfNeeded();
+  }
+
+  let authWired = false;
+  function wireAuthOnce() {
+    if (authWired) return;
+    authWired = true;
     wireAuth();
     $$(".nav-link").forEach((b) => b.addEventListener("click", () => go(b.dataset.route)));
     $("#hud-avatar").addEventListener("click", () => go("profile"));
@@ -1279,32 +1454,20 @@
     state.bot = new Mochi($("#bot-stage-gate"), 150);
     state.onboardBot = new Mochi($("#bot-stage-onboard"), 240);
     initBotDock();
-
-    // heartbeat keeps online status fresh (no-op in local mode)
-    if (window.ChimAPI.mode === "server") {
-      setInterval(() => { if (state.token) api("/heartbeat", { method: "POST" }).catch(() => {}); }, 40000);
-    }
-
     showModeBadge();
-
-    try {
-      const h = await api("/health");
+    api("/health").then((h) => {
       $("#stat-ach").textContent = h.achievements;
       $("#stat-langs").textContent = h.languages;
       $("#stat-lessons").textContent = h.lessons;
-    } catch (e) { /* offline ok */ }
+    }).catch(() => {});
+  }
 
-    // Restore an existing session. In local mode the account lives on the
-    // device, so we always bring the user straight back in.
-    try {
-      state.me = await api("/me");
-      await enterApp();
-    } catch (e) {
-      if (window.ChimAPI.mode === "server") {
-        state.token = "";
-        try { localStorage.removeItem("chimcode_token"); } catch (err) { /* ignore */ }
-      }
-      showGate();
+  let heartbeatStarted = false;
+  function setIntervalIfNeeded() {
+    if (heartbeatStarted) return;
+    heartbeatStarted = true;
+    if (window.ChimAPI.mode === "server") {
+      setInterval(() => { if (state.token) api("/heartbeat", { method: "POST" }).catch(() => {}); }, 40000);
     }
   }
 

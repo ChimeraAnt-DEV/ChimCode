@@ -41,11 +41,25 @@ function call(p, m, b) { return L.call(p, m || "GET", b); }
   await API.boot();
   check("API picks local mode", API.mode === "local");
   const health = await call("/health");
-  check("health local", health.local === true && health.achievements === 707, JSON.stringify(health));
+  check("health local", health.local === true && health.achievements > 700, JSON.stringify(health));
 
   const cat = await call("/catalogue");
-  check("catalogue 11 langs", cat.languages.length === 11);
-  check("catalogue 707 achievements", cat.achievementTotal === 707);
+
+  // ---- every lesson must ship a working reference solution ----
+  let badSolutions = 0;
+  let missingSolutions = 0;
+  for (const lang of cat.languages.map((l) => l.id)) {
+    const full = await call("/languages/" + lang);
+    for (const lesson of full.lessons) {
+      if (!lesson.solution) { missingSolutions += 1; continue; }
+      const g = await call("/analyze", "POST", { lesson_id: lesson.id, code: lesson.solution });
+      if (!g.passed) badSolutions += 1;
+    }
+  }
+  check("every lesson has a solution", missingSolutions === 0, missingSolutions + " missing");
+  check("every solution satisfies its checks", badSolutions === 0, badSolutions + " invalid");
+  check("catalogue 16+ langs", cat.languages.length >= 16);
+  check("catalogue 700+ achievements", cat.achievementTotal > 700);
 
   // fresh state -> /me must fail (no account yet) then register works
   let failedBefore = false;
@@ -173,7 +187,7 @@ function call(p, m, b) { return L.call(p, m || "GET", b); }
 
   // achievements listing
   const ach = await call("/achievements");
-  check("achievements 707 total", ach.total === 707);
+  check("achievements 700+ total", ach.total > 700);
   check("achievements earned count", ach.earned > 0, ach.earned);
 
   // persistence across reload

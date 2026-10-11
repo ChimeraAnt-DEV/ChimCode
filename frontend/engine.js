@@ -187,16 +187,68 @@
       .replace(/\(\?:/g, "").replace(/[()[\]]/g, "").replace(/[?+*]/g, "").trim();
   }
 
+  // Precise "type this" hint. Compares the learner's code to the reference
+  // line by line so the ghost always contains real code, not a fragment.
   function ghostFor(lesson, code, results) {
-    const unmet = (lesson.checks || []).filter((c) => {
-      if (!c.message) return false;
-      return !results.some((r) => r.message === c.message && r.ok);
-    });
-    if (!unmet.length) return null;
-    const check = unmet[0];
-    let value = String(check.value || "");
-    if (check.type === "regex") value = regexToPlaceholder(value);
-    return { message: check.message || "Add the missing piece here.", text: value, line: code.split("\n").length };
+    const lines = code.split("\n");
+    const typed = lines.map((l) => l.replace(/\s+$/, ""));
+
+    // 1. Point at an exact syntax fix when one exists.
+    const issues = analyze(lesson.language, code);
+    for (const issue of issues) {
+      if (issue.ghost) {
+        return { message: issue.message, text: issue.ghost, line: issue.line || lines.length, column: issue.column, mode: "insert" };
+      }
+    }
+
+    const unmetOf = () => (lesson.checks || []).filter(
+      (c) => c.message && !results.some((r) => r.message === c.message && r.ok));
+
+    // Only walk a reference line by line when that reference is a genuinely
+    // correct solution. Otherwise we would be pointing at code that does not
+    // satisfy the task.
+    const reference = referenceSolution(lesson);
+    const referencePasses = (lesson.checks || []).every((c) => checkOk(c, reference)[0]);
+    const ref = reference.split("\n").filter((l) => l.trim());
+    if (!referencePasses || !ref.length) {
+      const unmet = unmetOf();
+      if (!unmet.length) return null;
+      const check = unmet[0];
+      let value = String(check.value || "");
+      if (check.type === "regex") value = regexToPlaceholder(value);
+      return { message: check.message, text: value, line: lines.length, mode: "insert" };
+    }
+
+    // 2. Advance past lines already matched.
+    let idx = 0;
+    for (const ln of typed) {
+      const s = ln.trim();
+      if (!s) continue;
+      if (idx < ref.length && (s === ref[idx].trim() || ref[idx].includes(s))) idx += 1;
+    }
+
+    const unmet = unmetOf();
+    if (idx >= ref.length) {
+      if (!unmet.length) return null;
+      const check = unmet[0];
+      let value = String(check.value || "");
+      if (check.type === "regex") value = regexToPlaceholder(value);
+      return { message: check.message, text: value, line: lines.length, mode: "insert" };
+    }
+
+    const expected = ref[idx];
+    // 3. When a specific token is missing, prefer it over the whole line.
+    if (unmet.length) {
+      const check = unmet[0];
+      let value = String(check.value || "");
+      if (check.type === "regex") value = regexToPlaceholder(value);
+      if (value && !code.includes(value) && value.length <= expected.length) {
+        return { message: check.message, text: value, line: lines.length, mode: "insert" };
+      }
+    }
+
+    // 4. Otherwise give the exact next line to type.
+    return { message: "Next line — type this exactly:", text: expected.trim(), line: lines.length + 1, mode: "newline" };
   }
 
   function grade(lesson, code) {
@@ -220,10 +272,9 @@
   }
 
   function referenceSolution(lesson) {
-    const candidates = [lesson.example];
-    for (const c of candidates) {
-      if (c && (lesson.checks || []).every((ch) => checkOk(ch, c)[0])) return c;
-    }
+    if (lesson.solution && (lesson.checks || []).every((ch) => checkOk(ch, lesson.solution)[0])) return lesson.solution;
+    if (lesson.example && (lesson.checks || []).every((ch) => checkOk(ch, lesson.example)[0])) return lesson.example;
+    if (lesson.solution) return lesson.solution;
     return lesson.starter ? (lesson.starter + "\n" + lesson.example).trim() : lesson.example;
   }
 
@@ -267,26 +318,79 @@
     };
   }
 
+  // Mochi's coaching. It reads the actual state of the learner's code — what
+  // is missing, what is wrong, how far along they are — and answers with a
+  // specific, contextual explanation rather than a generic one.
   function botExplain(lesson, code, question) {
     const report = grade(lesson, code);
     const concept = (lesson.concept || "").toLowerCase();
     let talk = null;
     Object.keys(CONCEPT_TALK).forEach((k) => { if (!talk && concept.includes(k)) talk = CONCEPT_TALK[k]; });
-    const steps = (lesson.theory || []).map((t, i) => ({ title: `Step ${i + 1}`, detail: t }));
-    const issues = report.issues;
+
+    const unmet = (lesson.checks || []).filter(
+      (c) => c.message && !report.checks.some((r) => r.message === c.message && r.ok));
+    const done = (lesson.checks || []).filter(
+      (c) => report.checks.some((r) => r.message === c.message && r.ok));
+    const errors = report.issues.filter((i) => i.severity === "error");
+
+    // Build a plan tailored to where they actually are.
+    const steps = [];
+    if (done.length) {
+      steps.push({ title: "Already working", detail: "You have got " + done.length + " of " +
+        lesson.checks.length + " requirements right: " + done.map((c) => c.message.replace(/\.$/, "")).join("; ") + "." });
+    }
+    unmet.slice(0, 3).forEach((c, i) => {
+      steps.push({ title: "Still needed " + (i + 1), detail: c.message });
+    });
+    (lesson.theory || []).slice(0, 3).forEach((t, i) => {
+      steps.push({ title: "Concept " + (i + 1), detail: t });
+    });
+
+    const q = (question || "").toLowerCase();
     let spoken;
-    if (issues.length) {
-      const f = issues[0];
-      spoken = `I spotted something on line ${f.line}. ${f.message} ${f.expected ? "You should " + f.expected + "." : ""} Let me walk you through it.`;
+
+    // Direct answers to common questions, using the real code state.
+    if (q && /why|wrong|error|not work|broken|fail/.test(q)) {
+      if (errors.length) {
+        spoken = "Line " + errors[0].line + ": " + errors[0].message +
+          (errors[0].expected ? " Fix it by " + errors[0].expected + "." : "");
+      } else if (unmet.length) {
+        spoken = "Nothing is broken syntactically. What is missing is: " + unmet[0].message +
+          " I would add that next.";
+      } else {
+        spoken = "Your code passes every check. If it feels wrong, tell me what you expected to happen.";
+      }
+    } else if (q && /hint|help|stuck|how/.test(q)) {
+      if (unmet.length) {
+        spoken = "You still need to " + unmet[0].message.replace(/\.$/, "") +
+          ". " + (lesson.hints && lesson.hints[0] ? "Try: " + lesson.hints[0] : "");
+      } else {
+        spoken = "You are actually done. Try the challenge to prove it sticks.";
+      }
+    } else if (q && /what|explain|meaning|mean/.test(q)) {
+      spoken = (talk || lesson.task) + " In this lesson, " + concept + " is the whole point.";
+    } else if (errors.length) {
+      const f = errors[0];
+      spoken = "I found " + errors.length + " error" + (errors.length > 1 ? "s" : "") +
+        ". The first is on line " + f.line + ": " + f.message +
+        (f.expected ? " You should " + f.expected + "." : "") + " Let me show you.";
     } else if (report.passed) {
-      spoken = "Beautiful work. Every requirement is met and I found no mistakes. Want to try the challenge?";
+      spoken = "That is correct — all " + lesson.checks.length + " requirements are met and the code is clean. " +
+        "Try the challenge next, or teach it back to me in your own words.";
+    } else if (unmet.length) {
+      spoken = "You are " + Math.round((done.length / lesson.checks.length) * 100) +
+        "% of the way there. The next thing to add is: " + unmet[0].message;
     } else {
       spoken = "You are close. Let me point at the exact requirement that still needs your attention.";
     }
+
     return {
-      spoken, summary: talk || lesson.task, steps, issues, checks: report.checks,
+      spoken, summary: talk || lesson.task, steps, issues: report.issues, checks: report.checks,
       passed: report.passed, score: report.score, ghost: report.ghost,
       question: question || "", example: lesson.example, hints: lesson.hints || [],
+      unmet: unmet.map((c) => c.message),
+      done: done.map((c) => c.message),
+      progress: lesson.checks.length ? Math.round((done.length / lesson.checks.length) * 100) : 0,
     };
   }
 

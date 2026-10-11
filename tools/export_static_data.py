@@ -27,6 +27,8 @@ def _language_icon(lang_id: str) -> str:
         "typescript": "code", "java": "server", "csharp": "target",
         "go": "heartbeat", "rust": "settings", "sql": "db",
         "bash": "terminal", "htmlcss": "palette",
+        "kotlin": "code", "swift": "sparkle", "r": "chart",
+        "php": "server", "lua": "gamepad",
     }.get(lang_id, "code")
 
 

@@ -1,7 +1,7 @@
 """Registry that assembles every language and lesson into one catalogue."""
 from __future__ import annotations
 
-from . import cpp_lessons, more_lessons, python_lessons, web_lessons
+from . import cpp_lessons, extra_lessons, more_lessons, python_lessons, web_lessons
 from .schema import Language
 
 LANGUAGE_META = [
@@ -27,6 +27,16 @@ LANGUAGE_META = [
      "Glue for your machine: scripts, pipelines and automation."),
     ("htmlcss", "HTML & CSS", "Build beautiful interfaces", "🎨", "#e34f26",
      "The markup and styling that every website is made of."),
+    ("kotlin", "Kotlin", "Modern Android development", "🟪", "#7f52ff",
+     "Concise, null-safe and the language Google recommends for Android."),
+    ("swift", "Swift", "Apple platforms", "🕊️", "#f05138",
+     "Apple's language for iPhone, iPad and Mac apps."),
+    ("r", "R", "Statistics and data", "📈", "#276dc3",
+     "The analyst's language for statistics and visualisation."),
+    ("php", "PHP", "Power the web", "🐘", "#777bb4",
+     "Runs a huge share of the web and is easy to deploy."),
+    ("lua", "Lua", "Small and fast scripting", "🌙", "#2c2d72",
+     "Tiny, embeddable and the scripting language of many games."),
 ]
 
 LANGUAGES: dict[str, Language] = {}
@@ -42,6 +52,8 @@ def _build() -> None:
         by_lang[lesson.language].append(lesson)
     for lesson in more_lessons.LESSONS:
         by_lang[lesson.language].append(lesson)
+    for lesson in extra_lessons.LESSONS:
+        by_lang.setdefault(lesson.language, []).append(lesson)
 
     for lang_id, name, tagline, icon, color, blurb in LANGUAGE_META:
         LANGUAGES[lang_id] = Language(
@@ -58,10 +70,24 @@ def _build() -> None:
 _build()
 
 
+# Attach the known-correct solution to each lesson. The tests assert every one
+# against its lesson checks, so a bad entry fails the build.
+from . import solutions as _solutions  # noqa: E402
+
+
 def all_lessons():
     for language in LANGUAGES.values():
         for lesson in language.lessons:
             yield lesson
+
+
+def _attach_solutions() -> None:
+    for lesson in all_lessons():
+        if lesson.id in _solutions.SOLUTIONS:
+            lesson.solution = _solutions.SOLUTIONS[lesson.id]
+
+
+_attach_solutions()
 
 
 def find_lesson(lesson_id: str):
