@@ -187,21 +187,20 @@
       const lastLine = lines.length;
       const lastText = lines[lastLine - 1] || "";
 
-      // Trim whatever the user has already typed. We look for the longest
-      // suffix of the current line that is also a prefix of the hint, so
-      // typing "Hel" turns "Hello, ChimCode!" into "lo, ChimCode!".
-      let remaining = ghost.text;
-      const typed = lastText;
-      let best = 0;
-      for (let start = typed.length; start >= 0; start -= 1) {
-        const tail = typed.slice(start);
-        let j = 0;
-        while (j < tail.length && j < remaining.length && tail[j] === remaining[j]) j += 1;
-        if (j > best) best = j;
-      }
-      remaining = remaining.slice(best);
+      // Trim the part of the ghost that overlaps with what the user has
+      // already typed (from the left), so only the untyped tail remains.
+      const trimmedText = (() => {
+        const typedLine = lastText || "";
+        const text = ghost.text || "";
+        let best = 0;
+        for (let i = 0; i < Math.min(text.length, typedLine.length); i++) {
+          if (text[i] === typedLine[i]) best = i + 1;
+          else break;
+        }
+        return text.slice(best);
+      })();
 
-      if (!remaining) {
+      if (!trimmedText) {
         this.ghostEl.classList.add("hidden");
         this.hintBar.innerHTML =
           '<span class="h-with-ic">' + window.icon("check", 15) + escapeHtml(ghost.message) + "</span>";
@@ -211,14 +210,14 @@
 
       const top = PAD_TOP + (lastLine - 1) * LINE_HEIGHT - this.area.scrollTop;
       const left = 14 + measure(lastText.replace(/\s+$/, ""));
-      this.ghostEl.textContent = remaining;
+      this.ghostEl.textContent = trimmedText;
       this.ghostEl.style.top = top + "px";
       this.ghostEl.style.left = left + "px";
       this.ghostEl.classList.remove("hidden");
 
       this.hintBar.innerHTML =
         '<span class="h-with-ic">' + window.icon("bulb", 15) + escapeHtml(ghost.message) + "</span>" +
-        '<span class="ghost-snippet">' + escapeHtml(remaining) + "</span>";
+        '<span class="ghost-snippet">' + escapeHtml(trimmedText) + "</span>";
       this.hintBar.classList.remove("hidden");
     }
 
